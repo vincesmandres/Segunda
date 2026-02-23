@@ -1,7 +1,7 @@
 import { type ReactNode, type ButtonHTMLAttributes } from "react";
 import Link from "next/link";
 
-type ButtonVariant = "primary" | "secondary" | "ghost";
+type ButtonVariant = "primary" | "secondary";
 
 interface BaseProps {
   children: ReactNode;
@@ -24,11 +24,9 @@ type ButtonProps = ButtonAsButton | ButtonAsLink;
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    "bg-[var(--primary)] text-white border border-[var(--primary)] hover:bg-[var(--primary-hover)] hover:border-[var(--primary-hover)] shadow-sm",
+    "bg-[var(--black)] text-[var(--white)] border-2 border-[var(--black)] hover:bg-[var(--black)] hover:text-[var(--white)] shadow-[4px_4px_0_0_var(--black)] active:shadow-[1px_1px_0_0_var(--black)] active:translate-x-[3px] active:translate-y-[3px]",
   secondary:
-    "bg-transparent text-[var(--primary)] border border-[var(--primary)] hover:bg-[var(--primary)]/5",
-  ghost:
-    "text-[var(--muted)] border-transparent hover:text-[var(--foreground)] hover:bg-[var(--border)]/50",
+    "bg-[var(--white)] text-[var(--black)] border-2 border-[var(--black)] hover:bg-[var(--beige)] shadow-[4px_4px_0_0_var(--black)] active:shadow-[1px_1px_0_0_var(--black)] active:translate-x-[3px] active:translate-y-[3px]",
 };
 
 export function Button({
@@ -38,8 +36,8 @@ export function Button({
   ...props
 }: ButtonProps) {
   const base =
-    "inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30 focus:ring-offset-2 disabled:opacity-50";
-  const styles = `${base} ${variantStyles[variant]} ${className}`;
+    "inline-flex items-center justify-center gap-2 px-5 py-3 text-sm font-medium transition-all duration-75 ease-out focus:outline-none focus:ring-2 focus:ring-[var(--black)] focus:ring-offset-2 disabled:opacity-50 font-[var(--font-pixel)] tracking-wide select-none";
+  const styles = `${base} rounded-none ${variantStyles[variant]} ${className}`;
 
   if ("href" in props && props.href) {
     const { href, ...rest } = props;
