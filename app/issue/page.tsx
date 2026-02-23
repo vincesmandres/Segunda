@@ -3,17 +3,14 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import { Button, Input, Label, Card } from "@/components/ui";
-import { fakeHash } from "@/lib/hash-client";
 
-const STORAGE_KEY = "segunda_last_issued";
-
-interface IssuedData {
+interface IssueApiResponse {
   hash: string;
-  issuer_name: string;
-  subject_name: string;
-  program: string;
-  date: string;
-  internal_id: string;
+  verify_url: string;
+  created_at: string;
+  anchored: boolean;
+  tx_id: string | null;
+  stellar_url: string | null;
 }
 
 export default function IssuePage() {
@@ -22,43 +19,50 @@ export default function IssuePage() {
   const [program, setProgram] = useState("");
   const [date, setDate] = useState("");
   const [internal_id, setInternalId] = useState("");
-  const [issued, setIssued] = useState<IssuedData | null>(null);
+  const [issued, setIssued] = useState<IssueApiResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
+    async (e: React.FormEvent) => {
       e.preventDefault();
-      const payload = JSON.stringify({
-        issuer_name,
-        subject_name,
-        program,
-        date,
-        internal_id,
-      });
-      const hash = fakeHash(payload);
-      const data: IssuedData = {
-        hash,
-        issuer_name,
-        subject_name,
-        program,
-        date,
-        internal_id,
-      };
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/v1/issue", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            issuer_name,
+            subject_name,
+            program,
+            date,
+            internal_id,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data?.details ?? data?.error ?? "Error al emitir");
+          return;
+        }
+        setIssued(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error de conexión");
+      } finally {
+        setLoading(false);
       }
-      setIssued(data);
     },
     [issuer_name, subject_name, program, date, internal_id]
   );
 
-  const copyHash = useCallback(() => {
-    if (issued?.hash && typeof navigator?.clipboard !== "undefined") {
-      navigator.clipboard.writeText(issued.hash);
+  const copyVerifyUrl = useCallback(() => {
+    if (issued?.verify_url && typeof navigator?.clipboard !== "undefined") {
+      const fullUrl = typeof window !== "undefined" ? `${window.location.origin}${issued.verify_url}` : issued.verify_url;
+      navigator.clipboard.writeText(fullUrl);
     }
-  }, [issued?.hash]);
+  }, [issued?.verify_url]);
 
   if (issued) {
-    const verifyUrl = `/verify?hash=${encodeURIComponent(issued.hash)}`;
     return (
       <div className="min-h-screen flex flex-col">
         <header className="border-b-2 border-[var(--black)] py-4 px-6">
@@ -85,19 +89,37 @@ export default function IssuePage() {
                   {issued.hash}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-3">
-                <Button variant="primary" onClick={copyHash}>
-                  Copy
+              <div>
+                <Label>Anchored</Label>
+                <p className="text-sm">{issued.anchored ? "true" : "false"}</p>
+              </div>
+              {issued.tx_id && issued.stellar_url && (
+                <div>
+                  <Label>Stellar</Label>
+                  <a
+                    href={issued.stellar_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm underline hover:no-underline break-all"
+                  >
+                    {issued.stellar_url}
+                  </a>
+                </div>
+              )}
+              <div>
+                <Label>Verify URL</Label>
+                <p className="text-sm text-[var(--black)]/70 break-all mb-2">
+                  {issued.verify_url}
+                </p>
+                <Button variant="primary" onClick={copyVerifyUrl}>
+                  Copiar
                 </Button>
-                <Button variant="secondary" href={verifyUrl}>
+              </div>
+              <div>
+                <Button variant="secondary" href={issued.verify_url}>
                   Ir a verificar
                 </Button>
               </div>
-              <p className="text-sm text-[var(--black)]/70 break-all">
-                <Link href={verifyUrl} className="underline hover:no-underline">
-                  {verifyUrl}
-                </Link>
-              </p>
             </div>
           </Card>
         </main>
@@ -171,9 +193,12 @@ export default function IssuePage() {
                 required
               />
             </div>
+            {error && (
+              <p className="text-sm text-red-600">{error}</p>
+            )}
             <div className="pt-2">
-              <Button type="submit" variant="primary">
-                Emitir
+              <Button type="submit" variant="primary" disabled={loading}>
+                {loading ? "Emitiendo…" : "Emitir"}
               </Button>
             </div>
           </form>

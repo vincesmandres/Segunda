@@ -5,10 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button, Input, Label, Card } from "@/components/ui";
 
-const STORAGE_KEY = "segunda_last_issued";
-
-interface StoredData {
-  hash: string;
+interface RecordPayload {
   issuer_name: string;
   subject_name: string;
   program: string;
@@ -16,32 +13,49 @@ interface StoredData {
   internal_id: string;
 }
 
+interface RecordItem {
+  hash: string;
+  payload: RecordPayload;
+  created_at: string;
+  anchored: boolean;
+  tx_id: string | null;
+  stellar_url: string | null;
+}
+
 function VerifyContent() {
   const searchParams = useSearchParams();
   const hashFromUrl = searchParams.get("hash") ?? "";
   const [hash, setHash] = useState(hashFromUrl);
   const [result, setResult] = useState<"valid" | "invalid" | null>(null);
-  const [data, setData] = useState<StoredData | null>(null);
+  const [record, setRecord] = useState<RecordItem | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (hashFromUrl) setHash(hashFromUrl);
   }, [hashFromUrl]);
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     if (!hash.trim()) return;
-    const stored = typeof window !== "undefined" ? sessionStorage.getItem(STORAGE_KEY) : null;
-    if (!stored) {
+    setLoading(true);
+    setResult(null);
+    setRecord(null);
+    try {
+      const res = await fetch("/api/v1/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hash: hash.trim() }),
+      });
+      const data = await res.json();
+      if (data.valid && data.record) {
+        setResult("valid");
+        setRecord(data.record);
+      } else {
+        setResult("invalid");
+      }
+    } catch {
       setResult("invalid");
-      setData(null);
-      return;
-    }
-    const parsed: StoredData = JSON.parse(stored);
-    if (parsed.hash === hash.trim()) {
-      setResult("valid");
-      setData(parsed);
-    } else {
-      setResult("invalid");
-      setData(null);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -73,12 +87,12 @@ function VerifyContent() {
               onChange={(e) => setHash(e.target.value)}
               placeholder="Introduce el hash del certificado"
             />
-            <Button variant="primary" onClick={handleVerify}>
-              Verificar
+            <Button variant="primary" onClick={handleVerify} disabled={loading}>
+              {loading ? "Verificando…" : "Verificar"}
             </Button>
           </div>
 
-          {result === "valid" && data && (
+          {result === "valid" && record && (
             <div className="space-y-4 pt-4 border-t-2 border-[var(--black)]">
               <p
                 className="font-[var(--font-pixel)] text-sm text-green-700"
@@ -89,24 +103,49 @@ function VerifyContent() {
               <dl className="space-y-2 text-sm">
                 <div>
                   <dt className="text-[var(--black)]/70">Issuer</dt>
-                  <dd className="font-medium">{data.issuer_name}</dd>
+                  <dd className="font-medium">{record.payload.issuer_name}</dd>
                 </div>
                 <div>
                   <dt className="text-[var(--black)]/70">Subject</dt>
-                  <dd className="font-medium">{data.subject_name}</dd>
+                  <dd className="font-medium">{record.payload.subject_name}</dd>
                 </div>
                 <div>
                   <dt className="text-[var(--black)]/70">Program</dt>
-                  <dd className="font-medium">{data.program}</dd>
+                  <dd className="font-medium">{record.payload.program}</dd>
                 </div>
                 <div>
                   <dt className="text-[var(--black)]/70">Date</dt>
-                  <dd className="font-medium">{data.date}</dd>
+                  <dd className="font-medium">{record.payload.date}</dd>
                 </div>
                 <div>
                   <dt className="text-[var(--black)]/70">Internal ID</dt>
-                  <dd className="font-medium">{data.internal_id}</dd>
+                  <dd className="font-medium">{record.payload.internal_id}</dd>
                 </div>
+                <div>
+                  <dt className="text-[var(--black)]/70">Anchored</dt>
+                  <dd className="font-medium">{record.anchored ? "true" : "false"}</dd>
+                </div>
+                {record.tx_id && record.stellar_url && (
+                  <>
+                    <div>
+                      <dt className="text-[var(--black)]/70">Tx ID</dt>
+                      <dd className="font-medium break-all">{record.tx_id}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[var(--black)]/70">Stellar</dt>
+                      <dd>
+                        <a
+                          href={record.stellar_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm underline hover:no-underline break-all"
+                        >
+                          {record.stellar_url}
+                        </a>
+                      </dd>
+                    </div>
+                  </>
+                )}
               </dl>
             </div>
           )}
@@ -118,9 +157,6 @@ function VerifyContent() {
                 style={{ fontFamily: "var(--font-pixel)" }}
               >
                 INVALID
-              </p>
-              <p className="text-sm text-[var(--black)]/70 mt-2">
-                El hash no coincide con ningún certificado emitido en esta sesión.
               </p>
             </div>
           )}
