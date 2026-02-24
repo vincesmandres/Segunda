@@ -7,6 +7,7 @@ export type RecordItem = {
   anchored: boolean;
   tx_id: string | null;
   stellar_url: string | null;
+  issuer_public: string | null;
 };
 
 export async function saveRecord(record: RecordItem): Promise<void> {
@@ -22,6 +23,7 @@ export async function saveRecord(record: RecordItem): Promise<void> {
           anchored: record.anchored,
           tx_id: record.tx_id,
           stellar_url: record.stellar_url,
+          issuer_public: record.issuer_public ?? null,
         },
         { onConflict: "hash" }
       );
@@ -60,6 +62,7 @@ export async function findRecordByHash(hash: string): Promise<RecordItem | null>
       anchored: data.anchored ?? false,
       tx_id: data.tx_id ?? null,
       stellar_url: data.stellar_url ?? null,
+      issuer_public: data.issuer_public ?? null,
     };
   } catch (e) {
     if (e instanceof Error && e.message.startsWith("supabase_error:")) {
@@ -81,6 +84,7 @@ export async function updateRecordByHash(
     if (patch.anchored !== undefined) updatePayload.anchored = patch.anchored;
     if (patch.tx_id !== undefined) updatePayload.tx_id = patch.tx_id;
     if (patch.stellar_url !== undefined) updatePayload.stellar_url = patch.stellar_url;
+    if (patch.issuer_public !== undefined) updatePayload.issuer_public = patch.issuer_public;
 
     const { error } = await supabase
       .from("credentials")
@@ -114,6 +118,7 @@ export async function getAllRecords(): Promise<RecordItem[]> {
       anchored: row.anchored ?? false,
       tx_id: row.tx_id ?? null,
       stellar_url: row.stellar_url ?? null,
+      issuer_public: row.issuer_public ?? null,
     }));
   } catch (e) {
     if (e instanceof Error && e.message.startsWith("supabase_error:")) {

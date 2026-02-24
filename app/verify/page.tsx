@@ -19,6 +19,7 @@ interface RecordItem {
   anchored: boolean;
   tx_id: string | null;
   stellar_url: string | null;
+  issuer_public: string | null;
 }
 
 function VerifyContent() {
@@ -27,6 +28,7 @@ function VerifyContent() {
   const [hash, setHash] = useState(hashFromUrl);
   const [result, setResult] = useState<"valid" | "invalid" | null>(null);
   const [record, setRecord] = useState<RecordItem | null>(null);
+  const [network, setNetwork] = useState<"testnet" | "public">("testnet");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -48,6 +50,7 @@ function VerifyContent() {
       if (data.valid && data.record) {
         setResult("valid");
         setRecord(data.record);
+        setNetwork(data.network ?? "testnet");
       } else {
         setResult("invalid");
       }
@@ -110,6 +113,23 @@ function VerifyContent() {
                 <div>
                   <dt className="text-[var(--black)]/70">Internal ID</dt>
                   <dd className="font-medium">{record.payload.internal_id}</dd>
+                </div>
+                <div>
+                  <dt className="text-[var(--black)]/70">Issuer Wallet</dt>
+                  <dd className="font-medium font-mono text-sm break-all">
+                    {record.issuer_public ? (
+                      <a
+                        href={`https://stellar.expert/explorer/${network}/account/${record.issuer_public}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline hover:no-underline"
+                      >
+                        {record.issuer_public}
+                      </a>
+                    ) : (
+                      <span className="text-[var(--black)]/70">(no registrada)</span>
+                    )}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-[var(--black)]/70">Anchored</dt>

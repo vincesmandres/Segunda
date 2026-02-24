@@ -64,6 +64,15 @@ export async function buildUnsignedAnchorTx(params: {
   };
 }
 
+export function getSourceAccountFromXDR(
+  xdr: string,
+  networkPassphrase: string
+): string {
+  const txOrBump = TransactionBuilder.fromXDR(xdr, networkPassphrase);
+  const tx = "innerTransaction" in txOrBump ? txOrBump.innerTransaction : txOrBump;
+  return (tx as Transaction).source;
+}
+
 export function extractHashFromXDR(signed_xdr: string): string | null {
   try {
     const txOrBump = TransactionBuilder.fromXDR(signed_xdr, NETWORK_PASSPHRASE);

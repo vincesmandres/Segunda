@@ -44,6 +44,7 @@ export async function POST(request: Request) {
         anchored: false,
         tx_id: null as string | null,
         stellar_url: null as string | null,
+        issuer_public: null as string | null,
       };
       await saveRecord(record);
 
@@ -55,6 +56,7 @@ export async function POST(request: Request) {
           anchored: false,
           tx_id: null,
           stellar_url: null,
+          issuer_public: null,
           unsigned_xdr: null,
           network: (process.env.STELLAR_NETWORK ?? "testnet") as "testnet" | "public",
         },
@@ -92,6 +94,7 @@ export async function POST(request: Request) {
       anchored: false,
       tx_id: null as string | null,
       stellar_url: null as string | null,
+      issuer_public,
     };
     await saveRecord(record);
 
@@ -103,6 +106,7 @@ export async function POST(request: Request) {
         anchored: false,
         tx_id: null,
         stellar_url: null,
+        issuer_public,
         unsigned_xdr,
         network,
       },

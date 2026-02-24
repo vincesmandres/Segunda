@@ -16,7 +16,8 @@ export async function POST(request: Request) {
     const record = await findRecordByHash(hash.trim());
 
     if (record) {
-      return NextResponse.json({ valid: true, record }, { status: 200 });
+      const network = (process.env.STELLAR_NETWORK ?? "testnet") as "testnet" | "public";
+      return NextResponse.json({ valid: true, record, network }, { status: 200 });
     }
 
     return NextResponse.json({ valid: false }, { status: 200 });

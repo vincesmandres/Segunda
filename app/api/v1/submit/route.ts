@@ -3,6 +3,7 @@ import { TransactionBuilder } from "@stellar/stellar-sdk";
 import {
   getHorizonServer,
   extractHashFromXDR,
+  getSourceAccountFromXDR,
   NETWORK_PASSPHRASE,
 } from "@/lib/stellar/tx";
 import { findRecordByHash, updateRecordByHash } from "@/lib/storage";
@@ -27,6 +28,23 @@ export async function POST(request: Request) {
       );
     }
 
+    const record = await findRecordByHash(hash);
+    if (!record) {
+      return NextResponse.json(
+        { error: "not_found", details: "No existe un record con ese hash" },
+        { status: 404 }
+      );
+    }
+
+    // Idempotencia: si ya está anchored con tx_id, devolver 200 con datos existentes
+    if (record.anchored && record.tx_id && record.stellar_url) {
+      return NextResponse.json({
+        anchored: true,
+        tx_id: record.tx_id,
+        stellar_url: record.stellar_url,
+      });
+    }
+
     const extractedHash = extractHashFromXDR(signed_xdr);
     if (extractedHash !== hash) {
       return NextResponse.json(
@@ -35,12 +53,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const record = await findRecordByHash(hash);
-    if (!record) {
-      return NextResponse.json(
-        { error: "not_found", details: "No existe un record con ese hash" },
-        { status: 404 }
-      );
+    // Verificar que el source account del XDR coincida con issuer_public en DB
+    if (record.issuer_public) {
+      const source = getSourceAccountFromXDR(signed_xdr, NETWORK_PASSPHRASE);
+      if (source !== record.issuer_public) {
+        return NextResponse.json(
+          { error: "bad_request", details: "source_account_mismatch" },
+          { status: 400 }
+        );
+      }
     }
 
     const server = getHorizonServer();
