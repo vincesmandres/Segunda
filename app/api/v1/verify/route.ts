@@ -22,6 +22,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ valid: false }, { status: 200 });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    console.error("[verify] 500:", message);
     return NextResponse.json(
       { error: "internal_error", details: message },
       { status: 500 }

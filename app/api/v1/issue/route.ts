@@ -46,6 +46,7 @@ export async function POST(request: Request) {
     );
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    console.error("[issue] 500:", message);
     return NextResponse.json(
       { error: "internal_error", details: message },
       { status: 500 }

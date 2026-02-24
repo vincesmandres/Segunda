@@ -1,65 +1,124 @@
-import { readFile, writeFile, access } from "fs/promises";
-import path from "path";
+import { getSupabaseAdmin } from "./supabase-server";
 
 export type RecordItem = {
   hash: string;
-  payload: any;
+  payload: unknown;
   created_at: string;
   anchored: boolean;
   tx_id: string | null;
   stellar_url: string | null;
 };
 
-const STORE_PATH = path.join(process.cwd(), "data", "records.json");
-
-async function fileExists(filePath: string): Promise<boolean> {
+export async function saveRecord(record: RecordItem): Promise<void> {
   try {
-    await access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from("credentials")
+      .upsert(
+        {
+          hash: record.hash,
+          payload: record.payload,
+          created_at: record.created_at,
+          anchored: record.anchored,
+          tx_id: record.tx_id,
+          stellar_url: record.stellar_url,
+        },
+        { onConflict: "hash" }
+      );
 
-async function parseRecords(raw: string): Promise<RecordItem[]> {
-  let arr: unknown;
-  try {
-    arr = JSON.parse(raw);
+    if (error) {
+      throw new Error(`supabase_error: ${error.message}`);
+    }
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    throw new Error(`El archivo records.json está corrupto o no es JSON válido: ${msg}`);
+    if (e instanceof Error && e.message.startsWith("supabase_error:")) {
+      throw e;
+    }
+    throw new Error(`supabase_error: ${e instanceof Error ? e.message : String(e)}`);
   }
-  if (!Array.isArray(arr)) {
-    throw new Error("records.json debe contener un array JSON.");
-  }
-  return arr as RecordItem[];
 }
 
-export async function ensureStore(): Promise<void> {
-  const dir = path.dirname(STORE_PATH);
-  const exists = await fileExists(STORE_PATH);
-  if (!exists) {
-    const { mkdir } = await import("fs/promises");
-    await mkdir(dir, { recursive: true });
-    await writeFile(STORE_PATH, "[]", "utf8");
+export async function findRecordByHash(hash: string): Promise<RecordItem | null> {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("credentials")
+      .select("*")
+      .eq("hash", hash)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`supabase_error: ${error.message}`);
+    }
+
+    if (!data) return null;
+
+    return {
+      hash: data.hash,
+      payload: data.payload,
+      created_at: data.created_at,
+      anchored: data.anchored ?? false,
+      tx_id: data.tx_id ?? null,
+      stellar_url: data.stellar_url ?? null,
+    };
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith("supabase_error:")) {
+      throw e;
+    }
+    throw new Error(`supabase_error: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+export async function updateRecordByHash(
+  hash: string,
+  patch: Partial<Omit<RecordItem, "hash">>
+): Promise<void> {
+  try {
+    const supabase = getSupabaseAdmin();
+    const updatePayload: Record<string, unknown> = {};
+    if (patch.payload !== undefined) updatePayload.payload = patch.payload;
+    if (patch.created_at !== undefined) updatePayload.created_at = patch.created_at;
+    if (patch.anchored !== undefined) updatePayload.anchored = patch.anchored;
+    if (patch.tx_id !== undefined) updatePayload.tx_id = patch.tx_id;
+    if (patch.stellar_url !== undefined) updatePayload.stellar_url = patch.stellar_url;
+
+    const { error } = await supabase
+      .from("credentials")
+      .update(updatePayload)
+      .eq("hash", hash);
+
+    if (error) {
+      throw new Error(`supabase_error: ${error.message}`);
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith("supabase_error:")) {
+      throw e;
+    }
+    throw new Error(`supabase_error: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 
 export async function getAllRecords(): Promise<RecordItem[]> {
-  await ensureStore();
-  const raw = await readFile(STORE_PATH, "utf8");
-  return parseRecords(raw);
-}
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase.from("credentials").select("*");
 
-export async function findRecordByHash(hash: string): Promise<RecordItem | null> {
-  const records = await getAllRecords();
-  return records.find((r) => r.hash === hash) ?? null;
-}
+    if (error) {
+      throw new Error(`supabase_error: ${error.message}`);
+    }
 
-export async function saveRecord(record: RecordItem): Promise<void> {
-  await ensureStore();
-  const raw = await readFile(STORE_PATH, "utf8");
-  const arr = await parseRecords(raw);
-  arr.push(record);
-  await writeFile(STORE_PATH, JSON.stringify(arr, null, 2), "utf8");
+    return (data ?? []).map((row) => ({
+      hash: row.hash,
+      payload: row.payload,
+      created_at: row.created_at,
+      anchored: row.anchored ?? false,
+      tx_id: row.tx_id ?? null,
+      stellar_url: row.stellar_url ?? null,
+    }));
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith("supabase_error:")) {
+      throw e;
+    }
+    throw new Error(`supabase_error: ${e instanceof Error ? e.message : String(e)}`);
+  }
 }
