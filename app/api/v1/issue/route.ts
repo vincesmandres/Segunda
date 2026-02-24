@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
 import { canonicalizePayload, type IssueInput } from "@/lib/canonicalize";
 import { hashPayload } from "@/lib/hash";
-import { anchorHashOnStellar } from "@/lib/stellar";
+import { buildUnsignedAnchorTx } from "@/lib/stellar/tx";
 import { saveRecord } from "@/lib/storage";
+
+type IssueRequestBody = IssueInput & { issuer_public?: string };
+
+function isValidStellarPublicKey(s: string): boolean {
+  return /^G[A-Z2-7]{55}$/.test(s?.trim() ?? "");
+}
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as IssueInput;
+    const body = (await request.json()) as IssueRequestBody;
+    const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
     let canonical;
     try {
@@ -20,27 +27,84 @@ export async function POST(request: Request) {
     }
 
     const { hash } = hashPayload(canonical);
-    const stellar = await anchorHashOnStellar(hash);
+    const created_at = new Date().toISOString();
+
+    if (!body.issuer_public) {
+      if (!demoMode) {
+        return NextResponse.json(
+          { error: "bad_request", details: "issuer_public requerido para anchoring" },
+          { status: 400 }
+        );
+      }
+
+      const record = {
+        hash,
+        payload: canonical,
+        created_at,
+        anchored: false,
+        tx_id: null as string | null,
+        stellar_url: null as string | null,
+      };
+      await saveRecord(record);
+
+      return NextResponse.json(
+        {
+          hash,
+          verify_url: `/verify?hash=${hash}`,
+          created_at,
+          anchored: false,
+          tx_id: null,
+          stellar_url: null,
+          unsigned_xdr: null,
+          network: (process.env.STELLAR_NETWORK ?? "testnet") as "testnet" | "public",
+        },
+        { status: 201 }
+      );
+    }
+
+    const issuer_public = String(body.issuer_public).trim();
+    if (!isValidStellarPublicKey(issuer_public)) {
+      return NextResponse.json(
+        { error: "bad_request", details: "issuer_public inválido (debe ser public key G...)" },
+        { status: 400 }
+      );
+    }
+
+    let unsigned_xdr: string;
+    let network: "testnet" | "public";
+    try {
+      const built = await buildUnsignedAnchorTx({ issuer_public, hash });
+      unsigned_xdr = built.unsigned_xdr;
+      network = built.network;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.error("[issue] Horizon/buildUnsignedAnchorTx:", message);
+      return NextResponse.json(
+        { error: "internal_error", details: message },
+        { status: 500 }
+      );
+    }
 
     const record = {
       hash,
       payload: canonical,
-      created_at: new Date().toISOString(),
-      anchored: stellar.anchored,
-      tx_id: stellar.tx_id,
-      stellar_url: stellar.stellar_url,
+      created_at,
+      anchored: false,
+      tx_id: null as string | null,
+      stellar_url: null as string | null,
     };
-
     await saveRecord(record);
 
     return NextResponse.json(
       {
         hash,
         verify_url: `/verify?hash=${hash}`,
-        created_at: record.created_at,
-        anchored: record.anchored,
-        tx_id: record.tx_id,
-        stellar_url: record.stellar_url,
+        created_at,
+        anchored: false,
+        tx_id: null,
+        stellar_url: null,
+        unsigned_xdr,
+        network,
       },
       { status: 201 }
     );

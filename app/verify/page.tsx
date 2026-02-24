@@ -125,7 +125,7 @@ function VerifyContent() {
                   <dt className="text-[var(--black)]/70">Anchored</dt>
                   <dd className="font-medium">{record.anchored ? "true" : "false"}</dd>
                 </div>
-                {record.tx_id && record.stellar_url && (
+                {record.anchored && record.tx_id && record.stellar_url ? (
                   <>
                     <div>
                       <dt className="text-[var(--black)]/70">Tx ID</dt>
@@ -145,7 +145,11 @@ function VerifyContent() {
                       </dd>
                     </div>
                   </>
-                )}
+                ) : !record.anchored ? (
+                  <p className="text-sm text-[var(--black)]/70 pt-2">
+                    Anchoring pendiente (aún no firmado/enviado a Stellar).
+                  </p>
+                ) : null}
               </dl>
             </div>
           )}
