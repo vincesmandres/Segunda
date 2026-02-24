@@ -3,7 +3,7 @@ import { Button } from "@/components/ui";
 
 export default function Home() {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex-1 flex flex-col">
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-20">
         <div className="max-w-2xl w-full text-center space-y-12">
           <div className="space-y-6">

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { WalletProvider } from "@/components/WalletProvider";
+import { HeaderWithWallet } from "@/components/HeaderWithWallet";
 
 export const metadata: Metadata = {
   title: "Segunda — MVP",
@@ -13,8 +15,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body className="min-h-screen antialiased bg-[var(--beige)] text-[var(--black)]">
-        {children}
+      <body className="min-h-screen flex flex-col antialiased bg-[var(--beige)] text-[var(--black)]">
+        <WalletProvider>
+          <HeaderWithWallet />
+          <div className="flex-1 flex flex-col">{children}</div>
+        </WalletProvider>
       </body>
     </html>
   );

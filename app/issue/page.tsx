@@ -1,15 +1,9 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import Link from "next/link";
-import {
-  isConnected,
-  requestAccess,
-  getAddress,
-  getNetwork,
-  signTransaction,
-} from "@stellar/freighter-api";
+import { useState, useCallback } from "react";
+import { signTransaction } from "@stellar/freighter-api";
 import { Button, Input, Label, Card } from "@/components/ui";
+import { useWallet } from "@/components/WalletProvider";
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 const NETWORK_PASSPHRASES = {
@@ -39,40 +33,7 @@ export default function IssuePage() {
   const [loadStep, setLoadStep] = useState<"idle" | "issuing" | "signing" | "submitting">("idle");
   const [error, setError] = useState<string | null>(null);
 
-  const [freighterAvailable, setFreighterAvailable] = useState<boolean | null>(null);
-  const [issuerPublic, setIssuerPublic] = useState<string>("");
-  const [networkWarning, setNetworkWarning] = useState<string | null>(null);
-
-  useEffect(() => {
-    const check = async () => {
-      const res = await isConnected();
-      setFreighterAvailable(res.isConnected ?? false);
-    };
-    check();
-  }, []);
-
-  const handleConnectFreighter = useCallback(async () => {
-    setError(null);
-    setNetworkWarning(null);
-    const access = await requestAccess();
-    if (access.error || !access.address) {
-      setError(access.error?.message ?? "No se pudo conectar Freighter");
-      return;
-    }
-    setIssuerPublic(access.address);
-
-    const net = await getNetwork();
-    if (net.error) {
-      setNetworkWarning("No se pudo verificar la red.");
-      return;
-    }
-    const n = (net.network ?? "").toUpperCase();
-    if (n !== "TESTNET") {
-      setNetworkWarning(
-        `La red actual es ${n}. Para anclar en testnet, cambia la red en Freighter a TESTNET.`
-      );
-    }
-  }, []);
+  const { address: issuerPublic, isAvailable: freighterAvailable } = useWallet();
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -190,38 +151,9 @@ export default function IssuePage() {
     }
   }, [issued?.verify_url]);
 
-  const headerWallet = (
-    <div className="flex items-center gap-3">
-      {networkWarning && (
-        <span className="text-xs text-amber-700 max-w-[180px] truncate" title={networkWarning}>
-          {networkWarning}
-        </span>
-      )}
-      <Button
-        type="button"
-        variant="secondary"
-        onClick={handleConnectFreighter}
-        disabled={freighterAvailable === false}
-        className="!py-2 !px-3 !text-xs"
-      >
-        {issuerPublic ? `Conectado: ${issuerPublic.slice(0, 8)}…` : "Conectar Freighter"}
-      </Button>
-    </div>
-  );
-
   if (issued) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <header className="border-b-2 border-[var(--black)] py-4 px-6 flex items-center justify-between">
-          <Link
-            href="/"
-            className="font-[var(--font-pixel)] text-sm"
-            style={{ fontFamily: "var(--font-pixel)" }}
-          >
-            SEGUNDA
-          </Link>
-          {headerWallet}
-        </header>
+      <div className="flex-1 flex flex-col">
         <main className="flex-1 flex items-center justify-center px-6 py-16">
           <Card className="max-w-lg w-full space-y-8">
             <h1
@@ -288,17 +220,7 @@ export default function IssuePage() {
           : "Emitir";
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="border-b-2 border-[var(--black)] py-4 px-6 flex items-center justify-between">
-        <Link
-          href="/"
-          className="font-[var(--font-pixel)] text-sm"
-          style={{ fontFamily: "var(--font-pixel)" }}
-        >
-          SEGUNDA
-        </Link>
-        {headerWallet}
-      </header>
+    <div className="flex-1 flex flex-col">
       <main className="flex-1 flex items-center justify-center px-6 py-16">
         <Card className="max-w-lg w-full">
           <h1

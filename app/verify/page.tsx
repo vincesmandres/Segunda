@@ -2,7 +2,6 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { Button, Input, Label, Card } from "@/components/ui";
 
 interface RecordPayload {
@@ -60,16 +59,7 @@ function VerifyContent() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="border-b-2 border-[var(--black)] py-4 px-6">
-        <Link
-          href="/"
-          className="font-[var(--font-pixel)] text-sm"
-          style={{ fontFamily: "var(--font-pixel)" }}
-        >
-          SEGUNDA
-        </Link>
-      </header>
+    <div className="flex-1 flex flex-col">
       <main className="flex-1 flex items-center justify-center px-6 py-16">
         <Card className="max-w-lg w-full space-y-8">
           <h1
