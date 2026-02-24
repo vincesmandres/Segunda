@@ -55,7 +55,6 @@ export async function buildUnsignedAnchorTx(params: {
         source: issuer_public,
       })
     )
-    .setTimeout(60)
     .build();
 
   return {

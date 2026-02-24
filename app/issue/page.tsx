@@ -190,10 +190,29 @@ export default function IssuePage() {
     }
   }, [issued?.verify_url]);
 
+  const headerWallet = (
+    <div className="flex items-center gap-3">
+      {networkWarning && (
+        <span className="text-xs text-amber-700 max-w-[180px] truncate" title={networkWarning}>
+          {networkWarning}
+        </span>
+      )}
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={handleConnectFreighter}
+        disabled={freighterAvailable === false}
+        className="!py-2 !px-3 !text-xs"
+      >
+        {issuerPublic ? `Conectado: ${issuerPublic.slice(0, 8)}…` : "Conectar Freighter"}
+      </Button>
+    </div>
+  );
+
   if (issued) {
     return (
       <div className="min-h-screen flex flex-col">
-        <header className="border-b-2 border-[var(--black)] py-4 px-6">
+        <header className="border-b-2 border-[var(--black)] py-4 px-6 flex items-center justify-between">
           <Link
             href="/"
             className="font-[var(--font-pixel)] text-sm"
@@ -201,6 +220,7 @@ export default function IssuePage() {
           >
             SEGUNDA
           </Link>
+          {headerWallet}
         </header>
         <main className="flex-1 flex items-center justify-center px-6 py-16">
           <Card className="max-w-lg w-full space-y-8">
@@ -269,7 +289,7 @@ export default function IssuePage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b-2 border-[var(--black)] py-4 px-6">
+      <header className="border-b-2 border-[var(--black)] py-4 px-6 flex items-center justify-between">
         <Link
           href="/"
           className="font-[var(--font-pixel)] text-sm"
@@ -277,6 +297,7 @@ export default function IssuePage() {
         >
           SEGUNDA
         </Link>
+        {headerWallet}
       </header>
       <main className="flex-1 flex items-center justify-center px-6 py-16">
         <Card className="max-w-lg w-full">
@@ -304,20 +325,6 @@ export default function IssuePage() {
               </p>
             </div>
           )}
-
-          <div className="mb-6 space-y-2">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleConnectFreighter}
-              disabled={freighterAvailable === false}
-            >
-              {issuerPublic ? `Conectado: ${issuerPublic.slice(0, 8)}…` : "Conectar Freighter"}
-            </Button>
-            {networkWarning && (
-              <p className="text-sm text-amber-700">{networkWarning}</p>
-            )}
-          </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
