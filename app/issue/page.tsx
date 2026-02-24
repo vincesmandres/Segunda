@@ -1,11 +1,17 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { signTransaction } from "@stellar/freighter-api";
 import { Button, Input, Label, Card } from "@/components/ui";
 import { useWallet } from "@/components/WalletProvider";
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
+interface IssuerStatus {
+  allowed: boolean;
+  status?: string;
+  display_name?: string;
+}
 const NETWORK_PASSPHRASES = {
   testnet: "Test SDF Network ; September 2015",
   public: "Public Global Stellar Network ; September 2015",
@@ -34,6 +40,32 @@ export default function IssuePage() {
   const [error, setError] = useState<string | null>(null);
 
   const { address: issuerPublic, isAvailable: freighterAvailable } = useWallet();
+  const [issuerStatus, setIssuerStatus] = useState<IssuerStatus | null>(null);
+
+  useEffect(() => {
+    if (!issuerPublic) {
+      setIssuerStatus(null);
+      return;
+    }
+    const fn = async () => {
+      try {
+        const res = await fetch(
+          `/api/v1/issuer-status?issuer_public=${encodeURIComponent(issuerPublic)}`
+        );
+        const data = await res.json();
+        setIssuerStatus({
+          allowed: data.allowed ?? false,
+          status: data.status,
+          display_name: data.display_name,
+        });
+      } catch {
+        setIssuerStatus({ allowed: false });
+      }
+    };
+    fn();
+  }, [issuerPublic]);
+
+  const isIssuerActive = issuerStatus?.allowed ?? false;
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -230,6 +262,23 @@ export default function IssuePage() {
             EMITIR CERTIFICADO
           </h1>
 
+          {issuerPublic && (
+            <div className="mb-6">
+              <p className="text-sm">
+                Issuer status:{" "}
+                {issuerStatus === null ? (
+                  <span className="text-[var(--black)]/60">Verificando…</span>
+                ) : isIssuerActive ? (
+                  <span className="text-green-700 font-medium">active</span>
+                ) : (
+                  <span className="text-red-600 font-medium">
+                    {issuerStatus.status === "disabled" ? "disabled" : "not registered"}
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
+
           {freighterAvailable === false && !DEMO_MODE && (
             <div className="mb-6 p-4 bg-amber-50 border-2 border-amber-200 rounded text-sm">
               <p className="font-medium text-amber-800">Freighter no está instalado</p>
@@ -299,7 +348,11 @@ export default function IssuePage() {
               <Button
                 type="submit"
                 variant="primary"
-                disabled={loading || (!DEMO_MODE && !issuerPublic)}
+                disabled={
+                  loading ||
+                  (!DEMO_MODE && !issuerPublic) ||
+                  (!!issuerPublic && !isIssuerActive)
+                }
               >
                 {loading ? stepLabel : DEMO_MODE && !issuerPublic ? "Emitir (sin anclaje)" : "Emitir"}
               </Button>

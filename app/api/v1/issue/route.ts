@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { canonicalizePayload, type IssueInput } from "@/lib/canonicalize";
 import { hashPayload } from "@/lib/hash";
+import { isIssuerAllowed } from "@/lib/issuers";
 import { buildUnsignedAnchorTx } from "@/lib/stellar/tx";
 import { saveRecord } from "@/lib/storage";
 
@@ -69,6 +70,14 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "bad_request", details: "issuer_public inválido (debe ser public key G...)" },
         { status: 400 }
+      );
+    }
+
+    const allowed = await isIssuerAllowed(issuer_public);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "forbidden", details: "issuer_not_allowed" },
+        { status: 403 }
       );
     }
 
