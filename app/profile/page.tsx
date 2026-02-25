@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { requestAccess, getAddress } from "@stellar/freighter-api";
@@ -22,6 +22,7 @@ export default function ProfilePage() {
   const [walletLoading, setWalletLoading] = useState(false);
   const [walletTemp, setWalletTemp] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const autoLinkAttempted = useRef(false);
 
   const fetchProfile = useCallback(async () => {
     const supabase = createClient();
@@ -75,6 +76,47 @@ export default function ProfilePage() {
     fetchProfile().finally(() => setLoading(false));
   }, [fetchProfile]);
 
+  // Si no hay wallet vinculada, intentar detectar Freighter y vincular automáticamente (una vez por visita)
+  useEffect(() => {
+    if (!profile || profile.wallet_public || autoLinkAttempted.current) return;
+
+    const tryAutoLink = async () => {
+      autoLinkAttempted.current = true;
+      setWalletLoading(true);
+      setError(null);
+      try {
+        // Solo vincular si Freighter ya está conectado (getAddress). No abrir popup con requestAccess.
+        const addr = await getAddress();
+        const address = addr?.address?.trim();
+        if (!address) {
+          setWalletLoading(false);
+          return;
+        }
+        const res = await fetch("/api/profile/wallet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ wallet_public: address.trim() }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data?.details ?? data?.error ?? "Error al vincular");
+          setWalletTemp(address);
+          setWalletLoading(false);
+          return;
+        }
+        setWalletTemp("");
+        await fetchProfile();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Error al conectar");
+      } finally {
+        setWalletLoading(false);
+      }
+    };
+
+    tryAutoLink();
+  }, [profile, fetchProfile]);
+
   const handleConnectFreighter = async () => {
     setWalletLoading(true);
     setError(null);
@@ -104,6 +146,7 @@ export default function ProfilePage() {
       const res = await fetch("/api/profile/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ wallet_public: walletTemp }),
       });
       const data = await res.json();
@@ -124,6 +167,7 @@ export default function ProfilePage() {
       const res = await fetch("/api/profile/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ wallet_public: null }),
       });
       const data = await res.json();
