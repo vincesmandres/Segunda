@@ -20,10 +20,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = (await request.json()) as { wallet_public?: string };
-    const wallet_public = typeof body.wallet_public === "string" ? body.wallet_public.trim() : "";
+    const body = (await request.json()) as { wallet_public?: string | null };
+    const raw =
+      typeof body.wallet_public === "string" ? body.wallet_public.trim() : null;
 
-    if (!wallet_public || !isValidStellarPublicKey(wallet_public)) {
+    const wallet_public =
+      raw && raw.length > 0 ? raw : null;
+
+    if (wallet_public && !isValidStellarPublicKey(wallet_public)) {
       return NextResponse.json(
         { error: "bad_request", details: "wallet_public inválido (debe ser G...)" },
         { status: 400 }

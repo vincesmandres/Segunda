@@ -10,15 +10,11 @@ const navLinkClass =
   "inline-flex items-center py-2 px-3 text-xs font-medium font-[var(--font-pixel)] border-2 border-[var(--black)] bg-[var(--white)] text-[var(--black)] hover:bg-[var(--beige)] shadow-[4px_4px_0_0_var(--black)] no-underline";
 
 export function HeaderWithWallet() {
-  const { address, isAvailable, networkWarning, connect } = useWallet();
+  const { address, isAvailable, networkWarning, connect, disconnect } = useWallet();
   const isConnected_ = !!address;
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7381/ingest/4d3f4015-8d8c-4a6b-a4ca-febc0697e8d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8afd1e'},body:JSON.stringify({sessionId:'8afd1e',runId:'pre-fix',hypothesisId:'H1',location:'components/HeaderWithWallet.tsx:17',message:'Header auth init start',data:{},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-
     let subscription: { unsubscribe: () => void } | null = null;
     try {
       const supabase = createClient();
@@ -30,9 +26,6 @@ export function HeaderWithWallet() {
       });
       subscription = sub.data.subscription;
     } catch (e) {
-      // #region agent log
-      fetch('http://127.0.0.1:7381/ingest/4d3f4015-8d8c-4a6b-a4ca-febc0697e8d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8afd1e'},body:JSON.stringify({sessionId:'8afd1e',runId:'pre-fix',hypothesisId:'H1',location:'components/HeaderWithWallet.tsx:32',message:'Header auth init failed (createClient throw)',data:{error:e instanceof Error ? e.message : String(e)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       setUser(null);
     }
     return () => subscription?.unsubscribe();
@@ -76,6 +69,15 @@ export function HeaderWithWallet() {
           >
             {networkWarning}
           </span>
+        )}
+        {isConnected_ && (
+          <button
+            type="button"
+            onClick={disconnect}
+            className={navLinkClass}
+          >
+            Desconectar Wallet
+          </button>
         )}
         <button
           type="button"
