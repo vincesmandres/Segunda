@@ -33,12 +33,36 @@ export default function ProfilePage() {
       return;
     }
     await fetch("/api/profile/sync", { method: "POST" });
-    const { data } = await supabase
+
+    const { data, error } = await supabase
       .from("profiles")
       .select("id, email, full_name, avatar_url, wallet_public")
       .eq("id", user.id)
       .single();
-    setProfile(data ?? null);
+
+    if (error) {
+      console.error("[profile/page] load profile error", error.message);
+    }
+
+    if (!data) {
+      // Fallback: si aún no existe fila en profiles, usar los datos del user
+      setProfile({
+        id: user.id,
+        email: user.email ?? null,
+        full_name:
+          (user.user_metadata as any)?.full_name ??
+          (user.user_metadata as any)?.name ??
+          null,
+        avatar_url:
+          (user.user_metadata as any)?.avatar_url ??
+          (user.user_metadata as any)?.picture ??
+          null,
+        wallet_public: null,
+      });
+      return;
+    }
+
+    setProfile(data);
   }, [router]);
 
   useEffect(() => {
@@ -82,6 +106,25 @@ export default function ProfilePage() {
         return;
       }
       setWalletTemp("");
+      await fetchProfile();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error");
+    }
+  };
+
+  const handleUnlinkWallet = async () => {
+    setError(null);
+    try {
+      const res = await fetch("/api/profile/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet_public: null }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data?.details ?? data?.error ?? "Error al desvincular");
+        return;
+      }
       await fetchProfile();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
@@ -139,6 +182,17 @@ export default function ProfilePage() {
           <p className="font-mono text-sm break-all bg-[var(--beige)] p-3 border-2 border-[var(--black)]">
             {profile.wallet_public ?? "(no vinculada)"}
           </p>
+          {profile.wallet_public && (
+            <div className="mt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleUnlinkWallet}
+              >
+                Desvincular de mi perfil
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="border-t-2 border-[var(--black)] pt-4 space-y-4">

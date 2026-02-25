@@ -16,6 +16,7 @@ interface WalletContextValue {
   networkWarning: string | null;
   connect: () => Promise<void>;
   refresh: () => Promise<void>;
+  disconnect: () => void;
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null);
@@ -55,6 +56,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const disconnect = useCallback(() => {
+    setAddress("");
+    setNetworkWarning(null);
+  }, []);
+
   return (
     <WalletContext.Provider
       value={{
@@ -63,6 +69,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         networkWarning,
         connect,
         refresh,
+        disconnect,
       }}
     >
       {children}

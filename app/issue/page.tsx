@@ -349,10 +349,8 @@ export default function IssuePage() {
                 type="submit"
                 variant="primary"
                 disabled={
-                  loading ||
-                  (!DEMO_MODE && !issuerPublic) ||
-                  (!!issuerPublic && !isIssuerActive)
-                }
+                loading || (!DEMO_MODE && !issuerPublic)
+              }
               >
                 {loading ? stepLabel : DEMO_MODE && !issuerPublic ? "Emitir (sin anclaje)" : "Emitir"}
               </Button>

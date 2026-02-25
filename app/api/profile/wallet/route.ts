@@ -20,10 +20,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = (await request.json()) as { wallet_public?: string };
-    const wallet_public = typeof body.wallet_public === "string" ? body.wallet_public.trim() : "";
+    const body = (await request.json()) as { wallet_public?: string | null };
+    const rawWallet =
+      typeof body.wallet_public === "string" ? body.wallet_public.trim() : null;
 
-    if (!wallet_public || !isValidStellarPublicKey(wallet_public)) {
+    if (rawWallet && !isValidStellarPublicKey(rawWallet)) {
       return NextResponse.json(
         { error: "bad_request", details: "wallet_public inválido (debe ser G...)" },
         { status: 400 }
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
 
     const { error } = await supabase
       .from("profiles")
-      .update({ wallet_public })
+      .update({ wallet_public: rawWallet || null })
       .eq("id", user.id);
 
     if (error) {

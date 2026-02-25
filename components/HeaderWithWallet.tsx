@@ -10,7 +10,7 @@ const navLinkClass =
   "inline-flex items-center py-2 px-3 text-xs font-medium font-[var(--font-pixel)] border-2 border-[var(--black)] bg-[var(--white)] text-[var(--black)] hover:bg-[var(--beige)] shadow-[4px_4px_0_0_var(--black)] no-underline";
 
 export function HeaderWithWallet() {
-  const { address, isAvailable, networkWarning, connect } = useWallet();
+  const { address, isAvailable, networkWarning, connect, disconnect } = useWallet();
   const isConnected_ = !!address;
   const [user, setUser] = useState<User | null>(null);
 
@@ -77,14 +77,31 @@ export function HeaderWithWallet() {
             {networkWarning}
           </span>
         )}
-        <button
-          type="button"
-          onClick={connect}
-          disabled={isAvailable === false}
-          className={`${walletButtonBase} ${walletButtonStyles}`}
-        >
-          {isConnected_ ? `Conectado: ${address.slice(0, 8)}…` : "Conectar Freighter"}
-        </button>
+        {isConnected_ ? (
+          <>
+            <span
+              className={`${walletButtonBase} bg-emerald-600 text-white border-2 border-emerald-700 shadow-[4px_4px_0_0_var(--black)]`}
+            >
+              Conectado: {address.slice(0, 8)}…
+            </span>
+            <button
+              type="button"
+              onClick={disconnect}
+              className={`${walletButtonBase} bg-[var(--white)] text-[var(--black)] border-2 border-[var(--black)] hover:bg-[var(--beige)] shadow-[4px_4px_0_0_var(--black)] active:shadow-[1px_1px_0_0_var(--black)]`}
+            >
+              Desconectar Wallet
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={connect}
+            disabled={isAvailable === false}
+            className={`${walletButtonBase} ${walletButtonStyles}`}
+          >
+            Conectar Freighter
+          </button>
+        )}
       </nav>
     </header>
   );
