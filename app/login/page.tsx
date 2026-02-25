@@ -14,10 +14,14 @@ export default function LoginPage() {
     setError(null);
     try {
       const supabase = createClient();
-      const redirectTo =
-        typeof window !== "undefined"
-          ? `${window.location.origin}/auth/callback`
-          : "/auth/callback";
+      const baseUrl =
+        process.env.NEXT_PUBLIC_SITE_URL &&
+        process.env.NEXT_PUBLIC_SITE_URL.trim().length > 0
+          ? process.env.NEXT_PUBLIC_SITE_URL
+          : typeof window !== "undefined"
+          ? window.location.origin
+          : "";
+      const redirectTo = `${baseUrl}/auth/callback`;
       // Log mínimo para inspeccionar el redirect en el navegador
       console.log("[login] signInWithOAuth", { redirectTo });
       const { error: err } = await supabase.auth.signInWithOAuth({
