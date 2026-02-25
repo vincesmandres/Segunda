@@ -31,9 +31,28 @@ export async function POST(request: Request) {
       );
     }
 
+    // Obtener rol actual para evitar sobrescribir 'admin'
+    const { data: profileRow } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    let nextRole = profileRow?.role ?? null;
+    if (rawWallet && profileRow?.role === "user") {
+      nextRole = "issuer";
+    }
+
+    const update: { wallet_public: string | null; role?: string } = {
+      wallet_public: rawWallet || null,
+    };
+    if (nextRole && nextRole !== profileRow?.role) {
+      update.role = nextRole;
+    }
+
     const { error } = await supabase
       .from("profiles")
-      .update({ wallet_public: rawWallet || null })
+      .update(update)
       .eq("id", user.id);
 
     if (error) {

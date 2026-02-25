@@ -28,6 +28,10 @@ export default function ProfilePage() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
+    // #region agent log
+    fetch('http://127.0.0.1:7381/ingest/4d3f4015-8d8c-4a6b-a4ca-febc0697e8d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b702e'},body:JSON.stringify({sessionId:'4b702e',runId:'pre-fix-profile',hypothesisId:'P2',location:'app/profile/page.tsx:30',message:'profile/page auth.getUser',data:{hasUser:!!user},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     if (!user) {
       router.replace("/login");
       return;
@@ -45,6 +49,9 @@ export default function ProfilePage() {
     }
 
     if (!data) {
+      // #region agent log
+      fetch('http://127.0.0.1:7381/ingest/4d3f4015-8d8c-4a6b-a4ca-febc0697e8d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b702e'},body:JSON.stringify({sessionId:'4b702e',runId:'pre-fix-profile',hypothesisId:'P2',location:'app/profile/page.tsx:48',message:'profile/page no profiles row, using fallback',data:{},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       // Fallback: si aún no existe fila en profiles, usar los datos del user
       setProfile({
         id: user.id,
@@ -61,6 +68,10 @@ export default function ProfilePage() {
       });
       return;
     }
+
+    // #region agent log
+    fetch('http://127.0.0.1:7381/ingest/4d3f4015-8d8c-4a6b-a4ca-febc0697e8d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b702e'},body:JSON.stringify({sessionId:'4b702e',runId:'pre-fix-profile',hypothesisId:'P2',location:'app/profile/page.tsx:65',message:'profile/page profiles row loaded',data:{hasWallet:!!data.wallet_public},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     setProfile(data);
   }, [router]);
