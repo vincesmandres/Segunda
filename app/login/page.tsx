@@ -18,6 +18,8 @@ export default function LoginPage() {
         typeof window !== "undefined"
           ? `${window.location.origin}/auth/callback`
           : "/auth/callback";
+      // Log mínimo para inspeccionar el redirect en el navegador
+      console.log("[login] signInWithOAuth", { redirectTo });
       const { error: err } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo },

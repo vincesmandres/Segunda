@@ -2,18 +2,50 @@ import { NextResponse } from "next/server";
 import { createClientWithCookies } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const url = new URL(request.url);
+  const { searchParams, origin } = url;
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/profile";
 
-  if (code) {
-    const supabase = await createClientWithCookies();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
-    }
-    console.error("[auth/callback]", error.message);
-  }
+  try {
+    console.log("[auth/callback] hit", {
+      url: request.url,
+      hasCode: !!code,
+      next,
+      rawQuery: searchParams.toString(),
+    });
 
-  return NextResponse.redirect(`${origin}/login?error=auth_callback_error`);
+    if (!code) {
+      console.warn("[auth/callback] missing code param", {
+        searchParams: searchParams.toString(),
+      });
+      return NextResponse.redirect(`${origin}/login?error=auth_code_missing`);
+    }
+
+    const supabase = await createClientWithCookies();
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (error) {
+      console.error("[auth/callback] exchangeCodeForSession error", {
+        message: error.message,
+        name: error.name,
+        // @ts-expect-error - status may not exist in type but is useful if present
+        status: error.status,
+      });
+      return NextResponse.redirect(
+        `${origin}/login?error=auth_exchange_failed`
+      );
+    }
+
+    console.log("[auth/callback] exchangeCodeForSession success", {
+      userId: data?.session?.user?.id,
+    });
+
+    return NextResponse.redirect(`${origin}${next}`);
+  } catch (e) {
+    console.error("[auth/callback] unexpected error", {
+      error: e instanceof Error ? e.message : String(e),
+    });
+    return NextResponse.redirect(`${origin}/login?error=auth_callback_error`);
+  }
 }

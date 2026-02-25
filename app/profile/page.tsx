@@ -88,25 +88,6 @@ export default function ProfilePage() {
     }
   };
 
-  const handleUnlinkWallet = async () => {
-    setError(null);
-    try {
-      const res = await fetch("/api/profile/wallet", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wallet_public: null }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data?.details ?? data?.error ?? "Error al desvincular");
-        return;
-      }
-      await fetchProfile();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -183,15 +164,6 @@ export default function ProfilePage() {
                 onClick={handleLinkWallet}
               >
                 Vincular a mi perfil
-              </Button>
-            )}
-            {profile.wallet_public && (
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleUnlinkWallet}
-              >
-                Desvincular de mi perfil
               </Button>
             )}
           </div>
