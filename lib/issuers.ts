@@ -58,10 +58,6 @@ export async function isIssuerByProfile(
 
 export async function getIssuerStatus(issuer_public: string): Promise<IssuerStatusResult> {
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7381/ingest/4d3f4015-8d8c-4a6b-a4ca-febc0697e8d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b702e'},body:JSON.stringify({sessionId:'4b702e',runId:'pre-fix-issuers',hypothesisId:'H1',location:'lib/issuers.ts:60',message:'getIssuerStatus start',data:{issuerPublicSuffix:issuer_public.slice(-6)},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("issuers")
@@ -69,10 +65,6 @@ export async function getIssuerStatus(issuer_public: string): Promise<IssuerStat
       .eq("issuer_public", issuer_public.trim())
       .limit(1)
       .maybeSingle();
-
-    // #region agent log
-    fetch('http://127.0.0.1:7381/ingest/4d3f4015-8d8c-4a6b-a4ca-febc0697e8d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b702e'},body:JSON.stringify({sessionId:'4b702e',runId:'pre-fix-issuers',hypothesisId:'H1',location:'lib/issuers.ts:67',message:'getIssuerStatus db result',data:{hasError:!!error,hasData:!!data,status:data?.status},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
 
     if (error || !data) {
       return { allowed: false };

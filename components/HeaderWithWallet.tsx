@@ -15,10 +15,6 @@ export function HeaderWithWallet() {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7381/ingest/4d3f4015-8d8c-4a6b-a4ca-febc0697e8d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8afd1e'},body:JSON.stringify({sessionId:'8afd1e',runId:'pre-fix',hypothesisId:'H1',location:'components/HeaderWithWallet.tsx:17',message:'Header auth init start',data:{},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-
     let subscription: { unsubscribe: () => void } | null = null;
     try {
       const supabase = createClient();
@@ -30,9 +26,6 @@ export function HeaderWithWallet() {
       });
       subscription = sub.data.subscription;
     } catch (e) {
-      // #region agent log
-      fetch('http://127.0.0.1:7381/ingest/4d3f4015-8d8c-4a6b-a4ca-febc0697e8d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8afd1e'},body:JSON.stringify({sessionId:'8afd1e',runId:'pre-fix',hypothesisId:'H1',location:'components/HeaderWithWallet.tsx:32',message:'Header auth init failed (createClient throw)',data:{error:e instanceof Error ? e.message : String(e)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       setUser(null);
     }
     return () => subscription?.unsubscribe();

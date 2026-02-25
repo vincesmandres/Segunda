@@ -50,13 +50,10 @@ export default function IssuePage() {
     const fn = async () => {
       try {
         const res = await fetch(
-          `/api/v1/issuer-status?issuer_public=${encodeURIComponent(issuerPublic)}`
+          `/api/v1/issuer-status?issuer_public=${encodeURIComponent(issuerPublic)}`,
+          { credentials: "include" }
         );
         const data = await res.json();
-
-        // #region agent log
-        fetch('http://127.0.0.1:7381/ingest/4d3f4015-8d8c-4a6b-a4ca-febc0697e8d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b702e'},body:JSON.stringify({sessionId:'4b702e',runId:'pre-fix-issuers',hypothesisId:'H3',location:'app/issue/page.tsx:55',message:'issuer-status client result',data:{ok:res.ok,allowed:data?.allowed,status:data?.status},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
 
         setIssuerStatus({
           allowed: data.allowed ?? false,

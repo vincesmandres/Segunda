@@ -16,9 +16,6 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export async function createClientWithCookies() {
   if (!supabaseUrl || !supabaseAnonKey) {
-    // #region agent log
-    fetch('http://127.0.0.1:7381/ingest/4d3f4015-8d8c-4a6b-a4ca-febc0697e8d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8afd1e'},body:JSON.stringify({sessionId:'8afd1e',runId:'pre-fix',hypothesisId:'H2',location:'lib/supabase/server.ts:18',message:'Missing env for server supabase client',data:{hasUrl:!!supabaseUrl,hasAnonKey:!!supabaseAnonKey},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     throw new Error(
       "Faltan NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_ANON_KEY en las variables de entorno."
     );
