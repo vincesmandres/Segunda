@@ -1,0 +1,180 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { requestAccess, getAddress } from "@stellar/freighter-api";
+import { createClient } from "@/lib/supabase/client";
+import { Button, Label, Card } from "@/components/ui";
+
+interface Profile {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+  wallet_public: string | null;
+}
+
+export default function ProfilePage() {
+  const router = useRouter();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [walletTemp, setWalletTemp] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchProfile = useCallback(async () => {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+    await fetch("/api/profile/sync", { method: "POST" });
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, email, full_name, avatar_url, wallet_public")
+      .eq("id", user.id)
+      .single();
+    setProfile(data ?? null);
+  }, [router]);
+
+  useEffect(() => {
+    fetchProfile().finally(() => setLoading(false));
+  }, [fetchProfile]);
+
+  const handleConnectFreighter = async () => {
+    setWalletLoading(true);
+    setError(null);
+    try {
+      const addr = await getAddress();
+      if (addr?.address) {
+        setWalletTemp(addr.address);
+      } else {
+        const access = await requestAccess();
+        if (access?.address) {
+          setWalletTemp(access.address);
+        } else {
+          setError("No se pudo obtener la dirección");
+        }
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al conectar Freighter");
+    } finally {
+      setWalletLoading(false);
+    }
+  };
+
+  const handleLinkWallet = async () => {
+    if (!walletTemp.trim()) return;
+    setError(null);
+    try {
+      const res = await fetch("/api/profile/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet_public: walletTemp }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data?.details ?? data?.error ?? "Error al vincular");
+        return;
+      }
+      setWalletTemp("");
+      await fetchProfile();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <p className="text-[var(--black)]/70">Cargando…</p>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <p className="text-[var(--black)]/70">Redirigiendo…</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center px-6 py-16">
+      <Card className="max-w-lg w-full space-y-6">
+        <h1
+          className="text-lg font-[var(--font-pixel)]"
+          style={{ fontFamily: "var(--font-pixel)" }}
+        >
+          MI PERFIL
+        </h1>
+
+        <div className="flex items-center gap-4">
+          {profile.avatar_url ? (
+            <Image
+              src={profile.avatar_url}
+              alt="Avatar"
+              width={64}
+              height={64}
+              className="rounded-none border-2 border-[var(--black)]"
+            />
+          ) : (
+            <div className="w-16 h-16 border-2 border-[var(--black)] bg-[var(--beige)] flex items-center justify-center text-2xl">
+              ?
+            </div>
+          )}
+          <div>
+            <p className="font-medium">{profile.full_name ?? "—"}</p>
+            <p className="text-sm text-[var(--black)]/70">{profile.email ?? "—"}</p>
+          </div>
+        </div>
+
+        <div>
+          <Label>Wallet</Label>
+          <p className="font-mono text-sm break-all bg-[var(--beige)] p-3 border-2 border-[var(--black)]">
+            {profile.wallet_public ?? "(no vinculada)"}
+          </p>
+        </div>
+
+        <div className="border-t-2 border-[var(--black)] pt-4 space-y-4">
+          <h2
+            className="text-sm font-[var(--font-pixel)]"
+            style={{ fontFamily: "var(--font-pixel)" }}
+          >
+            Conectar Wallet (Freighter)
+          </h2>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleConnectFreighter}
+              disabled={walletLoading}
+            >
+              {walletLoading ? "Conectando…" : "Conectar Freighter"}
+            </Button>
+            {walletTemp && (
+              <Button
+                type="button"
+                variant="primary"
+                onClick={handleLinkWallet}
+              >
+                Vincular a mi perfil
+              </Button>
+            )}
+          </div>
+          {walletTemp && (
+            <p className="text-xs font-mono text-[var(--black)]/70 break-all">
+              {walletTemp}
+            </p>
+          )}
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </div>
+      </Card>
+    </div>
+  );
+}

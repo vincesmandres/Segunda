@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { canonicalizePayload, type IssueInput } from "@/lib/canonicalize";
 import { hashPayload } from "@/lib/hash";
-import { isIssuerAllowed } from "@/lib/issuers";
+import { isIssuerAllowed, isIssuerByProfile } from "@/lib/issuers";
 import { buildUnsignedAnchorTx } from "@/lib/stellar/tx";
 import { saveRecord } from "@/lib/storage";
+import { createClientWithCookies } from "@/lib/supabase/server";
 
 type IssueRequestBody = IssueInput & { issuer_public?: string };
 
@@ -73,7 +74,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const allowed = await isIssuerAllowed(issuer_public);
+    let allowed = await isIssuerAllowed(issuer_public);
+    if (!allowed) {
+      const supabase = await createClientWithCookies();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        allowed = await isIssuerByProfile(issuer_public, user.id);
+      }
+    }
     if (!allowed) {
       return NextResponse.json(
         { error: "forbidden", details: "issuer_not_allowed" },
