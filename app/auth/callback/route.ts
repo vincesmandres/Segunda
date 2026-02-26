@@ -29,8 +29,7 @@ export async function GET(request: Request) {
       console.error("[auth/callback] exchangeCodeForSession error", {
         message: error.message,
         name: error.name,
-        // @ts-expect-error - status may not exist in type but is useful if present
-        status: error.status,
+        status: (error as { status?: number }).status,
       });
       return NextResponse.redirect(
         `${origin}/login?error=auth_exchange_failed`
