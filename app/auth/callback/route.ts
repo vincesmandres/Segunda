@@ -6,24 +6,35 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const { searchParams, origin } = url;
   const code = searchParams.get("code");
+  const error = searchParams.get("error");
+  const errorDescription = searchParams.get("error_description");
   const next = searchParams.get("next");
 
+  // Supabase puede devolver errores directamente en la URL de callback
+  if (error) {
+    console.error("[auth/callback] OAuth error:", error, errorDescription);
+    const msg = encodeURIComponent(errorDescription ?? error);
+    return NextResponse.redirect(`${origin}/login?error=${msg}`);
+  }
+
+  if (!code) {
+    console.warn("[auth/callback] missing code param");
+    return NextResponse.redirect(`${origin}/login?error=auth_code_missing`);
+  }
+
   try {
-    if (!code) {
-      return NextResponse.redirect(`${origin}/login?error=auth_code_missing`);
-    }
-
     const supabase = await createClientWithCookies();
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (error) {
-      console.error("[auth/callback] exchangeCodeForSession error", error.message);
-      return NextResponse.redirect(`${origin}/login?error=auth_exchange_failed`);
+    if (exchangeError) {
+      console.error("[auth/callback] exchangeCodeForSession error:", exchangeError.message);
+      return NextResponse.redirect(
+        `${origin}/login?error=${encodeURIComponent(exchangeError.message)}`
+      );
     }
 
     const userId = data?.session?.user?.id;
 
-    // Si se especificó un destino explícito, respetar
     if (next) {
       return NextResponse.redirect(`${origin}${next}`);
     }
@@ -39,17 +50,18 @@ export async function GET(request: Request) {
           .maybeSingle();
 
         if (!profile?.wallet_public) {
-          // Primera vez o sin wallet → onboarding
           return NextResponse.redirect(`${origin}/profile?onboarding=true`);
         }
-      } catch {
-        // Si falla la consulta, ir igual al perfil sin onboarding
+      } catch (e) {
+        console.error("[auth/callback] profile check error:", e);
+        // Si falla la consulta, ir al perfil de todas formas
       }
     }
 
     return NextResponse.redirect(`${origin}/profile`);
   } catch (e) {
-    console.error("[auth/callback] unexpected error", e instanceof Error ? e.message : String(e));
-    return NextResponse.redirect(`${origin}/login?error=auth_callback_error`);
+    const msg = e instanceof Error ? e.message : "auth_callback_error";
+    console.error("[auth/callback] unexpected error:", msg);
+    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(msg)}`);
   }
 }
