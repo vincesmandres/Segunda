@@ -31,24 +31,28 @@ export async function POST(request: Request) {
       );
     }
 
-    // Obtener rol actual para evitar sobrescribir 'admin'
+    // Obtener rol actual para no bajar de admin
     const { data: profileRow } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single();
 
-    let nextRole = profileRow?.role ?? null;
-    if (rawWallet && profileRow?.role === "user") {
-      nextRole = "issuer";
+    // Al vincular wallet, marcar como issuer siempre (salvo si ya es admin)
+    let nextRole: string | null = profileRow?.role ?? null;
+    if (rawWallet) {
+      nextRole = profileRow?.role === "admin" ? "admin" : "issuer";
     }
 
     const update: { wallet_public: string | null; role?: string } = {
       wallet_public: rawWallet || null,
     };
-    if (nextRole && nextRole !== profileRow?.role) {
+    if (nextRole != null && nextRole !== profileRow?.role) {
       update.role = nextRole;
     }
+    // #region agent log
+    fetch('http://127.0.0.1:7381/ingest/4d3f4015-8d8c-4a6b-a4ca-febc0697e8d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b702e'},body:JSON.stringify({sessionId:'4b702e',location:'profile/wallet/route.ts:54',message:'wallet link payload',data:{hasWallet:!!rawWallet,walletSuffix:rawWallet?.slice(-8)??null,nextRole,updateRole:update.role,prevRole:profileRow?.role??null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     const { error } = await supabase
       .from("profiles")
