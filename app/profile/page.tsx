@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { requestAccess, getAddress } from "@stellar/freighter-api";
@@ -16,7 +16,7 @@ interface Profile {
   wallet_public: string | null;
 }
 
-export default function ProfilePage() {
+function ProfileContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const showOnboarding = searchParams.get("onboarding") === "true";
@@ -326,5 +326,13 @@ export default function ProfilePage() {
         </Card>
       </div>
     </>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<div className="flex-1 flex items-center justify-center"><p className="text-[var(--black)]/70">Cargando...</p></div>}>
+      <ProfileContent />
+    </Suspense>
   );
 }
