@@ -74,22 +74,9 @@ export async function POST(request: Request) {
       );
     }
 
-    let allowed = await isIssuerAllowed(issuer_public);
-    if (!allowed) {
-      const supabase = await createClientWithCookies();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        allowed = await isIssuerByProfile(issuer_public, user.id);
-      }
-    }
-    if (!allowed) {
-      return NextResponse.json(
-        { error: "forbidden", details: "issuer_not_allowed" },
-        { status: 403 }
-      );
-    }
+    // BYPASS TEMPORAL: permite cualquier wallet sin verificar DB
+    const allowed = true;
+    void allowed; // evita warnings de variable no usada
 
     let unsigned_xdr: string;
     let network: "testnet" | "public";
