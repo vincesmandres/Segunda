@@ -14,16 +14,8 @@ export default function LoginPage() {
     setError(null);
     try {
       const supabase = createClient();
-      const baseUrl =
-        process.env.NEXT_PUBLIC_SITE_URL &&
-        process.env.NEXT_PUBLIC_SITE_URL.trim().length > 0
-          ? process.env.NEXT_PUBLIC_SITE_URL
-          : typeof window !== "undefined"
-          ? window.location.origin
-          : "";
-      const redirectTo = `${baseUrl}/auth/callback`;
-      // Log mínimo para inspeccionar el redirect en el navegador
-      console.log("[login] signInWithOAuth", { redirectTo });
+      // Usar siempre el origen actual del navegador para evitar mismatches de redirect URL
+      const redirectTo = `${window.location.origin}/auth/callback`;
       const { error: err } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo },
@@ -31,11 +23,10 @@ export default function LoginPage() {
       if (err) {
         setError(err.message);
         setLoading(false);
-        return;
       }
+      // Si no hay error, el navegador redirige a Google automáticamente — no llamar setLoading(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al iniciar sesión");
-    } finally {
       setLoading(false);
     }
   };
@@ -57,9 +48,11 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full"
           >
-            {loading ? "Cargando…" : "Continuar con Google"}
+            {loading ? "Redirigiendo a Google…" : "Continuar con Google"}
           </Button>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && (
+            <p className="text-sm text-red-600 text-center">{error}</p>
+          )}
         </div>
         <p className="text-sm text-center text-[var(--black)]/70">
           <Link href="/" className="underline hover:no-underline">

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { requestAccess, getAddress } from "@stellar/freighter-api";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Label, Card } from "@/components/ui";
+import { WalletOnboardingModal } from "@/components/WalletOnboardingModal";
 
 interface Profile {
   id: string;
@@ -17,11 +18,17 @@ interface Profile {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const showOnboarding = searchParams.get("onboarding") === "true";
+
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [walletLoading, setWalletLoading] = useState(false);
   const [walletTemp, setWalletTemp] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [secretVisible, setSecretVisible] = useState(false);
+  const [storedSecret, setStoredSecret] = useState<string | null>(null);
   const autoLinkAttempted = useRef(false);
 
   const fetchProfile = useCallback(async () => {
@@ -47,75 +54,79 @@ export default function ProfilePage() {
       .eq("id", user.id)
       .single();
 
-    if (error) {
-      console.error("[profile/page] load profile error", error.message);
-    }
-
     if (!data) {
-      // Fallback: si aún no existe fila en profiles, usar los datos del user
       setProfile({
         id: user.id,
         email: user.email ?? null,
         full_name:
-          (user.user_metadata as any)?.full_name ??
-          (user.user_metadata as any)?.name ??
-          null,
+          (user.user_metadata as Record<string, string>)?.full_name ??
+          (user.user_metadata as Record<string, string>)?.name ?? null,
         avatar_url:
-          (user.user_metadata as any)?.avatar_url ??
-          (user.user_metadata as any)?.picture ??
-          null,
+          (user.user_metadata as Record<string, string>)?.avatar_url ??
+          (user.user_metadata as Record<string, string>)?.picture ?? null,
         wallet_public: null,
       });
       return;
     }
 
+    if (error) console.error("[profile/page] load profile error", (error as { message: string }).message);
     setProfile(data);
+
+    // Cargar secreto guardado si existe
+    try {
+      const raw = localStorage.getItem(`segunda_wallet_secret_${user.id}`);
+      if (raw) setStoredSecret(atob(raw));
+    } catch { /* ignora */ }
   }, [router]);
 
   useEffect(() => {
     fetchProfile().finally(() => setLoading(false));
   }, [fetchProfile]);
 
-  // Si no hay wallet vinculada, intentar detectar Freighter y vincular automáticamente (una vez por visita)
+  // Si llega con ?onboarding=true, abrir el modal
   useEffect(() => {
-    if (!profile || profile.wallet_public || autoLinkAttempted.current) return;
+    if (!loading && showOnboarding) {
+      setOnboardingOpen(true);
+    }
+  }, [loading, showOnboarding]);
 
+  // Auto-link Freighter si está conectado y no hay wallet vinculada
+  useEffect(() => {
+    if (!profile || profile.wallet_public || autoLinkAttempted.current || onboardingOpen) return;
     const tryAutoLink = async () => {
       autoLinkAttempted.current = true;
+      const addr = await getAddress();
+      const address = addr?.address?.trim();
+      if (!address) return;
       setWalletLoading(true);
-      setError(null);
-      try {
-        // Solo vincular si Freighter ya está conectado (getAddress). No abrir popup con requestAccess.
-        const addr = await getAddress();
-        const address = addr?.address?.trim();
-        if (!address) {
-          setWalletLoading(false);
-          return;
-        }
-        const res = await fetch("/api/profile/wallet", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ wallet_public: address.trim() }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          setError(data?.details ?? data?.error ?? "Error al vincular");
-          setWalletTemp(address);
-          setWalletLoading(false);
-          return;
-        }
-        setWalletTemp("");
-        await fetchProfile();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Error al conectar");
-      } finally {
-        setWalletLoading(false);
-      }
+      const res = await fetch("/api/profile/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ wallet_public: address }),
+      });
+      if (res.ok) await fetchProfile();
+      setWalletLoading(false);
     };
-
     tryAutoLink();
-  }, [profile, fetchProfile]);
+  }, [profile, fetchProfile, onboardingOpen]);
+
+  const handleOnboardingComplete = useCallback(async (walletPublic: string) => {
+    setOnboardingOpen(false);
+    // Limpiar param de la URL sin recargar
+    window.history.replaceState({}, "", "/profile");
+    await fetchProfile();
+    // Recargar secreto por si fue guardado
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      try {
+        const raw = localStorage.getItem(`segunda_wallet_secret_${user.id}`);
+        if (raw) setStoredSecret(atob(raw));
+      } catch { /* ignora */ }
+    }
+    void walletPublic;
+  }, [fetchProfile]);
 
   const handleConnectFreighter = async () => {
     setWalletLoading(true);
@@ -126,11 +137,8 @@ export default function ProfilePage() {
         setWalletTemp(addr.address);
       } else {
         const access = await requestAccess();
-        if (access?.address) {
-          setWalletTemp(access.address);
-        } else {
-          setError("No se pudo obtener la dirección");
-        }
+        if (access?.address) setWalletTemp(access.address);
+        else setError("No se pudo obtener la dirección");
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al conectar Freighter");
@@ -142,43 +150,29 @@ export default function ProfilePage() {
   const handleLinkWallet = async () => {
     if (!walletTemp.trim()) return;
     setError(null);
-    try {
-      const res = await fetch("/api/profile/wallet", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ wallet_public: walletTemp }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data?.details ?? data?.error ?? "Error al vincular");
-        return;
-      }
-      setWalletTemp("");
-      await fetchProfile();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
-    }
+    const res = await fetch("/api/profile/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ wallet_public: walletTemp }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setError(data?.details ?? data?.error ?? "Error al vincular"); return; }
+    setWalletTemp("");
+    await fetchProfile();
   };
 
   const handleUnlinkWallet = async () => {
     setError(null);
-    try {
-      const res = await fetch("/api/profile/wallet", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ wallet_public: null }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data?.details ?? data?.error ?? "Error al desvincular");
-        return;
-      }
-      await fetchProfile();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
-    }
+    const res = await fetch("/api/profile/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ wallet_public: null }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setError(data?.details ?? data?.error ?? "Error al desvincular"); return; }
+    await fetchProfile();
   };
 
   if (loading) {
@@ -198,87 +192,139 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-6 py-16">
-      <Card className="max-w-lg w-full space-y-6">
-        <h1
-          className="text-lg font-[var(--font-pixel)]"
-          style={{ fontFamily: "var(--font-pixel)" }}
-        >
-          MI PERFIL
-        </h1>
+    <>
+      {/* Modal de onboarding */}
+      {onboardingOpen && (
+        <WalletOnboardingModal
+          userId={profile.id}
+          onComplete={handleOnboardingComplete}
+        />
+      )}
 
-        <div className="flex items-center gap-4">
-          {profile.avatar_url ? (
-            <Image
-              src={profile.avatar_url}
-              alt="Avatar"
-              width={64}
-              height={64}
-              className="rounded-none border-2 border-[var(--black)]"
-            />
-          ) : (
-            <div className="w-16 h-16 border-2 border-[var(--black)] bg-[var(--beige)] flex items-center justify-center text-2xl">
-              ?
-            </div>
-          )}
-          <div>
-            <p className="font-medium">{profile.full_name ?? "—"}</p>
-            <p className="text-sm text-[var(--black)]/70">{profile.email ?? "—"}</p>
-          </div>
-        </div>
-
-        <div>
-          <Label>Wallet</Label>
-          <p className="font-mono text-sm break-all bg-[var(--beige)] p-3 border-2 border-[var(--black)]">
-            {profile.wallet_public ?? "(no vinculada)"}
-          </p>
-          {profile.wallet_public && (
-            <div className="mt-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleUnlinkWallet}
-              >
-                Desvincular de mi perfil
-              </Button>
-            </div>
-          )}
-        </div>
-
-        <div className="border-t-2 border-[var(--black)] pt-4 space-y-4">
-          <h2
-            className="text-sm font-[var(--font-pixel)]"
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-16">
+        <Card className="max-w-lg w-full space-y-6">
+          <h1
+            className="text-lg font-[var(--font-pixel)]"
             style={{ fontFamily: "var(--font-pixel)" }}
           >
-            Conectar Wallet (Freighter)
-          </h2>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleConnectFreighter}
-              disabled={walletLoading}
+            MI PERFIL
+          </h1>
+
+          {/* Avatar + nombre */}
+          <div className="flex items-center gap-4">
+            {profile.avatar_url ? (
+              <Image
+                src={profile.avatar_url}
+                alt="Avatar"
+                width={64}
+                height={64}
+                className="rounded-none border-2 border-[var(--black)]"
+              />
+            ) : (
+              <div className="w-16 h-16 border-2 border-[var(--black)] bg-[var(--beige)] flex items-center justify-center text-2xl">
+                ?
+              </div>
+            )}
+            <div>
+              <p className="font-medium">{profile.full_name ?? "—"}</p>
+              <p className="text-sm text-[var(--black)]/70">{profile.email ?? "—"}</p>
+            </div>
+          </div>
+
+          {/* Wallet pública */}
+          <div className="border-t-2 border-[var(--black)] pt-4 space-y-3">
+            <h2
+              className="text-sm font-[var(--font-pixel)]"
+              style={{ fontFamily: "var(--font-pixel)" }}
             >
-              {walletLoading ? "Conectando…" : "Conectar Freighter"}
-            </Button>
-            {walletTemp && (
-              <Button
-                type="button"
-                variant="primary"
-                onClick={handleLinkWallet}
-              >
-                Vincular a mi perfil
-              </Button>
+              WALLET STELLAR
+            </h2>
+            {profile.wallet_public ? (
+              <>
+                <div>
+                  <Label>Dirección pública</Label>
+                  <p className="font-mono text-xs break-all bg-[var(--beige)] p-3 border-2 border-[var(--black)] select-all">
+                    {profile.wallet_public}
+                  </p>
+                </div>
+
+                {/* Recovery key (solo si fue generada en este browser) */}
+                {storedSecret !== null && (
+                  <div>
+                    <Label>Clave secreta (recovery)</Label>
+                    {secretVisible ? (
+                      <p className="font-mono text-xs break-all bg-red-50 border-2 border-red-400 p-3 select-all">
+                        {storedSecret}
+                      </p>
+                    ) : (
+                      <button
+                        onClick={() => setSecretVisible(true)}
+                        className="w-full text-sm bg-red-50 border-2 border-red-400 p-3 text-red-700 hover:bg-red-100 transition-colors"
+                      >
+                        Clic para revelar clave secreta
+                      </button>
+                    )}
+                    <p className="text-xs text-[var(--black)]/60 mt-1">
+                      ⚠️ Solo almacenada en este navegador. Guárdala en un lugar seguro.
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex gap-2 flex-wrap">
+                  <Button type="button" variant="secondary" onClick={handleUnlinkWallet}>
+                    Desvincular wallet
+                  </Button>
+                  <Button type="button" variant="secondary" onClick={() => setOnboardingOpen(true)}>
+                    Cambiar wallet
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-[var(--black)]/70">No tienes una wallet vinculada.</p>
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={() => setOnboardingOpen(true)}
+                >
+                  Configurar wallet
+                </Button>
+              </div>
             )}
           </div>
-          {walletTemp && (
-            <p className="text-xs font-mono text-[var(--black)]/70 break-all">
-              {walletTemp}
-            </p>
+
+          {/* Conectar Freighter manualmente si ya hay wallet */}
+          {!profile.wallet_public && (
+            <div className="border-t-2 border-[var(--black)] pt-4 space-y-3">
+              <h2
+                className="text-sm font-[var(--font-pixel)]"
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
+                CONECTAR FREIGHTER
+              </h2>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleConnectFreighter}
+                  disabled={walletLoading}
+                >
+                  {walletLoading ? "Conectando…" : "Conectar Freighter"}
+                </Button>
+                {walletTemp && (
+                  <Button type="button" variant="primary" onClick={handleLinkWallet}>
+                    Vincular
+                  </Button>
+                )}
+              </div>
+              {walletTemp && (
+                <p className="text-xs font-mono text-[var(--black)]/70 break-all">{walletTemp}</p>
+              )}
+              {error && <p className="text-sm text-red-600">{error}</p>}
+            </div>
           )}
-          {error && <p className="text-sm text-red-600">{error}</p>}
-        </div>
-      </Card>
-    </div>
+        </Card>
+      </div>
+    </>
   );
 }
