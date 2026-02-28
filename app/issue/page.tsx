@@ -35,7 +35,7 @@ export default function IssuePage() {
   const [issuer_name, setIssuerName] = useState("");
   const [subject_name, setSubjectName] = useState("");
   const [program, setProgram] = useState("");
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [internal_id, setInternalId] = useState("");
   const [issued, setIssued] = useState<IssueApiResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -339,8 +339,13 @@ export default function IssuePage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            <p className="text-sm text-neutral-600 mb-2">
+              Los siguientes datos son del certificado y se rellenan manualmente (no se obtienen de la wallet).
+            </p>
             <div>
-              <Label htmlFor="issuer_name">Issuer name</Label>
+              <Label htmlFor="issuer_name">
+                Issuer name <span className="text-red-500" aria-hidden="true">*</span>
+              </Label>
               <Input
                 id="issuer_name"
                 value={issuer_name}
@@ -349,7 +354,9 @@ export default function IssuePage() {
               />
             </div>
             <div>
-              <Label htmlFor="subject_name">Subject name</Label>
+              <Label htmlFor="subject_name">
+                Subject name <span className="text-red-500" aria-hidden="true">*</span>
+              </Label>
               <Input
                 id="subject_name"
                 value={subject_name}
@@ -358,7 +365,9 @@ export default function IssuePage() {
               />
             </div>
             <div>
-              <Label htmlFor="program">Program</Label>
+              <Label htmlFor="program">
+                Program <span className="text-red-500" aria-hidden="true">*</span>
+              </Label>
               <Input
                 id="program"
                 value={program}
@@ -367,7 +376,9 @@ export default function IssuePage() {
               />
             </div>
             <div>
-              <Label htmlFor="date">Date</Label>
+              <Label htmlFor="date">
+                Date <span className="text-red-500" aria-hidden="true">*</span>
+              </Label>
               <Input
                 id="date"
                 type="date"
