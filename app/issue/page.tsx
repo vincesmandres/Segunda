@@ -51,23 +51,12 @@ export default function IssuePage() {
       return;
     }
     const fn = async () => {
-      // #region agent log
-      fetch('http://127.0.0.1:7381/ingest/4d3f4015-8d8c-4a6b-a4ca-febc0697e8d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b702e'},body:JSON.stringify({sessionId:'4b702e',location:'issue/page.tsx:useEffect',message:'fetching issuer status',data:{issuerPublicSuffix:issuerPublic.slice(-8),issuerPublicLen:issuerPublic.length},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       try {
         const res = await fetch(
           `/api/v1/issuer-status?issuer_public=${encodeURIComponent(issuerPublic)}`,
           { credentials: "include" }
         );
         const data = await res.json();
-
-        // #region agent log
-<<<<<<< HEAD
-        fetch('http://127.0.0.1:7381/ingest/4d3f4015-8d8c-4a6b-a4ca-febc0697e8d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b702e'},body:JSON.stringify({sessionId:'4b702e',location:'issue/page.tsx:issuer-status-response',message:'issuer status response',data:{ok:res.ok,allowed:data?.allowed,status:data?.status,hasError:!!data?.error},timestamp:Date.now()})}).catch(()=>{});
-=======
-        console.log("[DEBUG issuer-status client]", { ok: res.ok, allowed: data?.allowed, status: data?.status, hasError: !!data?.error });
->>>>>>> origin/feature/certificate-record-qr-bulk
-        // #endregion
 
         setIssuerStatus({
           allowed: data.allowed ?? false,

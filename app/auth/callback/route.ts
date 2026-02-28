@@ -1,67 +1,50 @@
 import { NextResponse } from "next/server";
 import { createClientWithCookies } from "@/lib/supabase/server";
-import { getSupabaseAdmin } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const { searchParams, origin } = url;
   const code = searchParams.get("code");
-  const error = searchParams.get("error");
-  const errorDescription = searchParams.get("error_description");
-  const next = searchParams.get("next");
-
-  // Supabase puede devolver errores directamente en la URL de callback
-  if (error) {
-    console.error("[auth/callback] OAuth error:", error, errorDescription);
-    const msg = encodeURIComponent(errorDescription ?? error);
-    return NextResponse.redirect(`${origin}/login?error=${msg}`);
-  }
-
-  if (!code) {
-    console.warn("[auth/callback] missing code param");
-    return NextResponse.redirect(`${origin}/login?error=auth_code_missing`);
-  }
+  const next = searchParams.get("next") ?? "/profile";
 
   try {
-    const supabase = await createClientWithCookies();
-    const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    console.log("[auth/callback] hit", {
+      url: request.url,
+      hasCode: !!code,
+      next,
+      rawQuery: searchParams.toString(),
+    });
 
-    if (exchangeError) {
-      console.error("[auth/callback] exchangeCodeForSession error:", exchangeError.message);
+    if (!code) {
+      console.warn("[auth/callback] missing code param", {
+        searchParams: searchParams.toString(),
+      });
+      return NextResponse.redirect(`${origin}/login?error=auth_code_missing`);
+    }
+
+    const supabase = await createClientWithCookies();
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (error) {
+      console.error("[auth/callback] exchangeCodeForSession error", {
+        message: error.message,
+        name: error.name,
+        status: (error as { status?: number }).status,
+      });
       return NextResponse.redirect(
-        `${origin}/login?error=${encodeURIComponent(exchangeError.message)}`
+        `${origin}/login?error=auth_exchange_failed`
       );
     }
 
-    const userId = data?.session?.user?.id;
+    console.log("[auth/callback] exchangeCodeForSession success", {
+      userId: data?.session?.user?.id,
+    });
 
-    if (next) {
-      return NextResponse.redirect(`${origin}${next}`);
-    }
-
-    // Verificar si el usuario ya tiene wallet configurada
-    if (userId) {
-      try {
-        const admin = getSupabaseAdmin();
-        const { data: profile } = await admin
-          .from("profiles")
-          .select("wallet_public")
-          .eq("id", userId)
-          .maybeSingle();
-
-        if (!profile?.wallet_public) {
-          return NextResponse.redirect(`${origin}/profile?onboarding=true`);
-        }
-      } catch (e) {
-        console.error("[auth/callback] profile check error:", e);
-        // Si falla la consulta, ir al perfil de todas formas
-      }
-    }
-
-    return NextResponse.redirect(`${origin}/profile`);
+    return NextResponse.redirect(`${origin}${next}`);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "auth_callback_error";
-    console.error("[auth/callback] unexpected error:", msg);
-    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(msg)}`);
+    console.error("[auth/callback] unexpected error", {
+      error: e instanceof Error ? e.message : String(e),
+    });
+    return NextResponse.redirect(`${origin}/login?error=auth_callback_error`);
   }
 }

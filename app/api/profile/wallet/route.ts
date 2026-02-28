@@ -50,13 +50,6 @@ export async function POST(request: Request) {
     if (nextRole != null && nextRole !== profileRow?.role) {
       update.role = nextRole;
     }
-    // #region agent log
-<<<<<<< HEAD
-    fetch('http://127.0.0.1:7381/ingest/4d3f4015-8d8c-4a6b-a4ca-febc0697e8d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b702e'},body:JSON.stringify({sessionId:'4b702e',location:'profile/wallet/route.ts:54',message:'wallet link payload',data:{hasWallet:!!rawWallet,walletSuffix:rawWallet?.slice(-8)??null,nextRole,updateRole:update.role,prevRole:profileRow?.role??null},timestamp:Date.now()})}).catch(()=>{});
-=======
-    console.log("[DEBUG profile/wallet] update payload", { hasWallet: !!rawWallet, nextRole, updateRole: update.role });
->>>>>>> origin/feature/certificate-record-qr-bulk
-    // #endregion
 
     const { error } = await supabase
       .from("profiles")
