@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server";
+import { checkRateLimit, getClientIdentifier } from "@/lib/rate-limit";
 import { findRecordByHash } from "@/lib/storage";
 
 export async function POST(request: Request) {
   try {
+    const id = getClientIdentifier(request);
+    const rl = checkRateLimit(`verify:${id}`);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: "too_many_requests", details: "Demasiadas solicitudes. Intenta más tarde." },
+        { status: 429, headers: rl.retryAfter ? { "Retry-After": String(rl.retryAfter) } : undefined }
+      );
+    }
     const body = (await request.json()) as { hash?: string };
     const hash = body?.hash;
 

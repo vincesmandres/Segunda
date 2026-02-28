@@ -1,12 +1,14 @@
+import { randomBytes } from "crypto";
 import { getSupabaseAdmin } from "./supabase-server";
 
 const TOKEN_LENGTH = 14;
 const TOKEN_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 function generateToken(): string {
+  const bytes = randomBytes(TOKEN_LENGTH);
   let s = "";
   for (let i = 0; i < TOKEN_LENGTH; i++) {
-    s += TOKEN_CHARS[Math.floor(Math.random() * TOKEN_CHARS.length)];
+    s += TOKEN_CHARS[bytes[i]! % TOKEN_CHARS.length];
   }
   return s;
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { canonicalizePayload, type IssueInput } from "@/lib/canonicalize";
 import { hashPayload } from "@/lib/hash";
 import { isIssuerAllowed, isIssuerByProfile } from "@/lib/issuers";
+import { checkRateLimit, getClientIdentifier } from "@/lib/rate-limit";
 import { buildUnsignedAnchorTx } from "@/lib/stellar/tx";
 import { saveRecord } from "@/lib/storage";
 import {
@@ -18,6 +19,14 @@ function isValidStellarPublicKey(s: string): boolean {
 
 export async function POST(request: Request) {
   try {
+    const id = getClientIdentifier(request);
+    const rl = checkRateLimit(`issue:${id}`);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: "too_many_requests", details: "Demasiadas solicitudes. Intenta más tarde." },
+        { status: 429, headers: rl.retryAfter ? { "Retry-After": String(rl.retryAfter) } : undefined }
+      );
+    }
     const body = (await request.json()) as IssueRequestBody;
     const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 

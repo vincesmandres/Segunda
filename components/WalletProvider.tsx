@@ -32,9 +32,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const addr = await getAddress();
     const resolvedAddress = addr?.address ?? "";
     setAddress(resolvedAddress);
-    // #region agent log
-    fetch('http://127.0.0.1:7381/ingest/4d3f4015-8d8c-4a6b-a4ca-febc0697e8d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b702e'},body:JSON.stringify({sessionId:'4b702e',location:'WalletProvider.tsx:refresh',message:'wallet refresh result',data:{isConnected:res.isConnected??false,addrError:addr?.error??null,addressLen:resolvedAddress.length,addressSuffix:resolvedAddress.slice(-8)||'(empty)'},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
   }, []);
 
   useEffect(() => {

@@ -14,6 +14,14 @@ export type CanonicalPayload = {
   internal_id: string;
 };
 
+const MAX_LENGTH = 1000;
+
+function assertMaxLength(value: string, field: string): void {
+  if (value.length > MAX_LENGTH) {
+    throw new Error(`${field} no puede superar ${MAX_LENGTH} caracteres.`);
+  }
+}
+
 function normalizeDate(dateStr: string): string {
   const trimmed = dateStr.trim();
   // Ya está en YYYY-MM-DD
@@ -64,6 +72,10 @@ export function canonicalizePayload(input: IssueInput): CanonicalPayload {
   if (!program) {
     throw new Error("program no puede estar vacío.");
   }
+  assertMaxLength(issuer_name, "issuer_name");
+  assertMaxLength(subject_name, "subject_name");
+  assertMaxLength(program, "program");
+  assertMaxLength(internal_id, "internal_id");
 
   return {
     issuer_name,

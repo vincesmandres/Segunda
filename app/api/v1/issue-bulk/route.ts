@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { canonicalizePayload, type IssueInput } from "@/lib/canonicalize";
 import { hashPayload } from "@/lib/hash";
+import { checkRateLimit, getClientIdentifier } from "@/lib/rate-limit";
 import { saveRecord } from "@/lib/storage";
 import {
   getOrCreateSubjectProfile,
@@ -11,6 +12,14 @@ const MAX_BULK_ROWS = 200;
 
 export async function POST(request: Request) {
   try {
+    const id = getClientIdentifier(request);
+    const rl = checkRateLimit(`issue-bulk:${id}`);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: "too_many_requests", details: "Demasiadas solicitudes. Intenta más tarde." },
+        { status: 429, headers: rl.retryAfter ? { "Retry-After": String(rl.retryAfter) } : undefined }
+      );
+    }
     const body = (await request.json()) as {
       rows?: unknown[];
       issuer_public?: string;
