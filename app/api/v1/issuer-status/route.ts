@@ -19,20 +19,28 @@ export async function GET(request: Request) {
     }
 
     let profileAllowed = false;
+    let hasUser = false;
     try {
       const supabase = await createClientWithCookies();
       const {
         data: { user },
       } = await supabase.auth.getUser();
+      hasUser = !!user?.id;
       if (user?.id) {
         profileAllowed = await isIssuerByProfile(issuer_public, user.id);
       }
+      // #region agent log
+      console.log("[DEBUG issuer-status] auth", { hasUser, profileAllowed, issuerSuffix: issuer_public.slice(-6) });
+      // #endregion
     } catch {
       profileAllowed = false;
     }
 
     const baseStatus = await getIssuerStatus(issuer_public);
     const allowed = baseStatus.allowed || profileAllowed;
+    // #region agent log
+    console.log("[DEBUG issuer-status] result", { baseAllowed: baseStatus.allowed, profileAllowed, allowed });
+    // #endregion
     const status =
       baseStatus.allowed
         ? baseStatus.status

@@ -18,9 +18,12 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap">
             <Button href="/issue" variant="primary">
               Emitir
+            </Button>
+            <Button href="/emitir-lote" variant="secondary">
+              Emitir en lote (CSV)
             </Button>
             <Button href="/verify" variant="secondary">
               Verificar

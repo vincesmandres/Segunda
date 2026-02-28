@@ -30,8 +30,8 @@ export type IssuerStatusResult = {
 };
 
 /**
- * Verifica si el usuario logueado tiene role='issuer' y su wallet_public coincide.
- * Permite emisión sin estar en la whitelist de issuers.
+ * Verifica si el usuario logueado tiene esa wallet vinculada en su perfil.
+ * Permite emisión sin estar en la whitelist de issuers (role puede ser 'issuer' o 'user' con wallet vinculada).
  */
 export async function isIssuerByProfile(
   issuer_public: string,
@@ -39,15 +39,20 @@ export async function isIssuerByProfile(
 ): Promise<boolean> {
   try {
     const supabase = getSupabaseAdmin();
+    const trimmed = issuer_public.trim();
+    // Cualquier perfil con esta wallet vinculada para este usuario puede emitir (role issuer o user)
     const { data, error } = await supabase
       .from("profiles")
       .select("role, wallet_public")
       .eq("id", userId)
-      .eq("role", "issuer")
-      .eq("wallet_public", issuer_public.trim())
+      .eq("wallet_public", trimmed)
       .limit(1)
       .maybeSingle();
 
+    const matched = !!(data && !error);
+    // #region agent log
+    console.log("[DEBUG isIssuerByProfile]", { matched, hasError: !!error });
+    // #endregion
     if (error || !data) return false;
     return true;
   } catch (e) {

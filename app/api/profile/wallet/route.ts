@@ -31,24 +31,28 @@ export async function POST(request: Request) {
       );
     }
 
-    // Obtener rol actual para evitar sobrescribir 'admin'
+    // Obtener rol actual para no bajar de admin
     const { data: profileRow } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single();
 
-    let nextRole = profileRow?.role ?? null;
-    if (rawWallet && profileRow?.role === "user") {
-      nextRole = "issuer";
+    // Al vincular wallet, marcar como issuer siempre (salvo si ya es admin)
+    let nextRole: string | null = profileRow?.role ?? null;
+    if (rawWallet) {
+      nextRole = profileRow?.role === "admin" ? "admin" : "issuer";
     }
 
     const update: { wallet_public: string | null; role?: string } = {
       wallet_public: rawWallet || null,
     };
-    if (nextRole && nextRole !== profileRow?.role) {
+    if (nextRole != null && nextRole !== profileRow?.role) {
       update.role = nextRole;
     }
+    // #region agent log
+    console.log("[DEBUG profile/wallet] update payload", { hasWallet: !!rawWallet, nextRole, updateRole: update.role });
+    // #endregion
 
     const { error } = await supabase
       .from("profiles")
