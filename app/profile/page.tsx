@@ -7,7 +7,10 @@ import { requestAccess, getAddress, signMessage } from "@stellar/freighter-api";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Label, Card } from "@/components/ui";
 import { WalletOnboardingModal } from "@/components/WalletOnboardingModal";
+import { useWallet } from "@/components/WalletProvider";
 import { QRCodeSVG } from "qrcode.react";
+
+const PROFILE_WALLET_UPDATED = "segunda-profile-wallet-updated";
 
 interface Profile {
   id: string;
@@ -22,6 +25,7 @@ function ProfileContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const showOnboarding = searchParams.get("onboarding") === "true";
+  const { disconnect } = useWallet();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -171,6 +175,7 @@ function ProfileContent() {
     const data = await res.json();
     if (!res.ok) { setError(data?.details ?? data?.error ?? "Error al vincular"); return; }
     setWalletTemp("");
+    window.dispatchEvent(new CustomEvent(PROFILE_WALLET_UPDATED));
     await fetchProfile();
   };
 
@@ -184,6 +189,8 @@ function ProfileContent() {
     });
     const data = await res.json();
     if (!res.ok) { setError(data?.details ?? data?.error ?? "Error al desvincular"); return; }
+    disconnect();
+    window.dispatchEvent(new CustomEvent(PROFILE_WALLET_UPDATED));
     await fetchProfile();
   };
 
