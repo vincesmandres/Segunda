@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { signTransaction } from "@stellar/freighter-api";
+import { QRCodeSVG } from "qrcode.react";
 import { Button, Input, Label, Card } from "@/components/ui";
 import { useWallet } from "@/components/WalletProvider";
 
@@ -26,6 +27,8 @@ interface IssueApiResponse {
   stellar_url: string | null;
   unsigned_xdr: string | null;
   network: "testnet" | "public";
+  profile_token?: string | null;
+  profile_url?: string | null;
 }
 
 export default function IssuePage() {
@@ -59,7 +62,11 @@ export default function IssuePage() {
         const data = await res.json();
 
         // #region agent log
+<<<<<<< HEAD
         fetch('http://127.0.0.1:7381/ingest/4d3f4015-8d8c-4a6b-a4ca-febc0697e8d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b702e'},body:JSON.stringify({sessionId:'4b702e',location:'issue/page.tsx:issuer-status-response',message:'issuer status response',data:{ok:res.ok,allowed:data?.allowed,status:data?.status,hasError:!!data?.error},timestamp:Date.now()})}).catch(()=>{});
+=======
+        console.log("[DEBUG issuer-status client]", { ok: res.ok, allowed: data?.allowed, status: data?.status, hasError: !!data?.error });
+>>>>>>> origin/feature/certificate-record-qr-bulk
         // #endregion
 
         setIssuerStatus({
@@ -193,6 +200,15 @@ export default function IssuePage() {
   }, [issued?.verify_url]);
 
   if (issued) {
+    const fullVerifyUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}${issued.verify_url}`
+        : issued.verify_url;
+    const fullProfileUrl =
+      issued.profile_url && typeof window !== "undefined"
+        ? `${window.location.origin}${issued.profile_url}`
+        : issued.profile_url ?? "";
+
     return (
       <div className="flex-1 flex flex-col">
         <main className="flex-1 flex items-center justify-center px-6 py-16">
@@ -203,13 +219,49 @@ export default function IssuePage() {
             >
               CERTIFICADO EMITIDO
             </h1>
+            <p className="text-sm text-[var(--black)]/80">
+              La persona certificada puede guardar el enlace o el QR para revisar y verificar.
+            </p>
             <div className="space-y-4">
               <div>
-                <Label>Hash</Label>
+                <Label>Hash (registro del certificado)</Label>
                 <p className="font-mono text-sm break-all bg-[var(--beige)] p-3 border-2 border-[var(--black)]">
                   {issued.hash}
                 </p>
               </div>
+              <div>
+                <Label>Verificar este certificado</Label>
+                <p className="text-sm text-[var(--black)]/70 break-all mb-2">
+                  {fullVerifyUrl}
+                </p>
+                <div className="flex flex-wrap items-center gap-4">
+                  <Button variant="primary" onClick={copyVerifyUrl}>
+                    Copiar enlace
+                  </Button>
+                  <div className="bg-white p-2 border-2 border-[var(--black)]">
+                    <QRCodeSVG value={fullVerifyUrl} size={120} level="M" />
+                  </div>
+                </div>
+              </div>
+              {issued.profile_url && (
+                <div>
+                  <Label>Perfil de certificaciones (todas las de esta persona)</Label>
+                  <p className="text-sm text-[var(--black)]/70 break-all mb-2">
+                    {fullProfileUrl}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <Button
+                      variant="secondary"
+                      href={issued.profile_url}
+                    >
+                      Ver perfil
+                    </Button>
+                    <div className="bg-white p-2 border-2 border-[var(--black)]">
+                      <QRCodeSVG value={fullProfileUrl} size={120} level="M" />
+                    </div>
+                  </div>
+                </div>
+              )}
               <div>
                 <Label>Anchored</Label>
                 <p className="text-sm">{issued.anchored ? "true" : "false"}</p>
@@ -230,15 +282,6 @@ export default function IssuePage() {
                   </a>
                 </div>
               )}
-              <div>
-                <Label>Verify URL</Label>
-                <p className="text-sm text-[var(--black)]/70 break-all mb-2">
-                  {issued.verify_url}
-                </p>
-                <Button variant="primary" onClick={copyVerifyUrl}>
-                  Copiar
-                </Button>
-              </div>
               <div>
                 <Button variant="secondary" href={issued.verify_url}>
                   Ir a verificar

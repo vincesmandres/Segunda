@@ -48,6 +48,15 @@ export function HeaderWithWallet() {
         SEGUNDA
       </Link>
       <nav className="flex items-center gap-3">
+        <Link href="/issue" className={navLinkClass}>
+          Emitir
+        </Link>
+        <Link href="/emitir-lote" className={navLinkClass}>
+          Lote (CSV)
+        </Link>
+        <Link href="/verify" className={navLinkClass}>
+          Verificar
+        </Link>
         {user ? (
           <>
             <Link href="/profile" className={navLinkClass}>

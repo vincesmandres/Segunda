@@ -4,6 +4,10 @@ import { hashPayload } from "@/lib/hash";
 import { isIssuerAllowed, isIssuerByProfile } from "@/lib/issuers";
 import { buildUnsignedAnchorTx } from "@/lib/stellar/tx";
 import { saveRecord } from "@/lib/storage";
+import {
+  getOrCreateSubjectProfile,
+  linkCertificateToSubject,
+} from "@/lib/subject-profile";
 import { createClientWithCookies } from "@/lib/supabase/server";
 
 type IssueRequestBody = IssueInput & { issuer_public?: string };
@@ -50,6 +54,20 @@ export async function POST(request: Request) {
       };
       await saveRecord(record);
 
+      let profile_token: string | null = null;
+      let profile_url: string | null = null;
+      try {
+        const subjectProfile = await getOrCreateSubjectProfile(
+          canonical.subject_name,
+          canonical.internal_id
+        );
+        await linkCertificateToSubject(subjectProfile.id, hash);
+        profile_token = subjectProfile.token;
+        profile_url = `/perfil-certificado/${subjectProfile.token}`;
+      } catch (e) {
+        console.warn("[issue] subject profile link failed:", e);
+      }
+
       return NextResponse.json(
         {
           hash,
@@ -61,6 +79,8 @@ export async function POST(request: Request) {
           issuer_public: null,
           unsigned_xdr: null,
           network: (process.env.STELLAR_NETWORK ?? "testnet") as "testnet" | "public",
+          profile_token,
+          profile_url,
         },
         { status: 201 }
       );
@@ -104,6 +124,20 @@ export async function POST(request: Request) {
     };
     await saveRecord(record);
 
+    let profile_token: string | null = null;
+    let profile_url: string | null = null;
+    try {
+      const subjectProfile = await getOrCreateSubjectProfile(
+        canonical.subject_name,
+        canonical.internal_id
+      );
+      await linkCertificateToSubject(subjectProfile.id, hash);
+      profile_token = subjectProfile.token;
+      profile_url = `/perfil-certificado/${subjectProfile.token}`;
+    } catch (e) {
+      console.warn("[issue] subject profile link failed:", e);
+    }
+
     return NextResponse.json(
       {
         hash,
@@ -115,6 +149,8 @@ export async function POST(request: Request) {
         issuer_public,
         unsigned_xdr,
         network,
+        profile_token,
+        profile_url,
       },
       { status: 201 }
     );
