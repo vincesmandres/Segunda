@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { requestAccess, getAddress } from "@stellar/freighter-api";
+import { requestAccess, getAddress, signMessage } from "@stellar/freighter-api";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Label, Card } from "@/components/ui";
 import { WalletOnboardingModal } from "@/components/WalletOnboardingModal";
+import { QRCodeSVG } from "qrcode.react";
 
 interface Profile {
   id: string;
@@ -14,6 +15,7 @@ interface Profile {
   full_name: string | null;
   avatar_url: string | null;
   wallet_public: string | null;
+  subject_profile_token: string | null;
 }
 
 function ProfileContent() {
@@ -29,6 +31,12 @@ function ProfileContent() {
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [secretVisible, setSecretVisible] = useState(false);
   const [storedSecret, setStoredSecret] = useState<string | null>(null);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [recoveryRevealLoading, setRecoveryRevealLoading] = useState(false);
+  const [recoveryRevealError, setRecoveryRevealError] = useState<string | null>(null);
+  const [profileTokenInput, setProfileTokenInput] = useState("");
+  const [profileTokenSaving, setProfileTokenSaving] = useState(false);
+  const [profileTokenError, setProfileTokenError] = useState<string | null>(null);
   const autoLinkAttempted = useRef(false);
 
   const fetchProfile = useCallback(async () => {
@@ -50,7 +58,7 @@ function ProfileContent() {
 
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, email, full_name, avatar_url, wallet_public")
+      .select("id, email, full_name, avatar_url, wallet_public, subject_profile_token")
       .eq("id", user.id)
       .single();
 
@@ -65,12 +73,16 @@ function ProfileContent() {
           (user.user_metadata as Record<string, string>)?.avatar_url ??
           (user.user_metadata as Record<string, string>)?.picture ?? null,
         wallet_public: null,
+        subject_profile_token: null,
       });
       return;
     }
 
     if (error) console.error("[profile/page] load profile error", (error as { message: string }).message);
-    setProfile(data);
+    setProfile({
+      ...data,
+      subject_profile_token: (data as { subject_profile_token?: string | null }).subject_profile_token ?? null,
+    });
 
     // Cargar secreto guardado si existe
     try {
@@ -175,6 +187,52 @@ function ProfileContent() {
     await fetchProfile();
   };
 
+  const handleRevealSecretWithWallet = useCallback(async () => {
+    if (!profile?.wallet_public || !storedSecret) return;
+    setRecoveryRevealError(null);
+    setRecoveryRevealLoading(true);
+    try {
+      const message = `Segunda - Revelar clave de recuperación - ${new Date().toISOString().slice(0, 10)}`;
+      const result = await signMessage(message, { address: profile.wallet_public });
+      if (result.error) {
+        setRecoveryRevealError(result.error.message ?? "Freighter rechazó la solicitud");
+        return;
+      }
+      if ((result.signerAddress ?? "").trim() !== profile.wallet_public.trim()) {
+        setRecoveryRevealError("La wallet que firmó no coincide con la vinculada. Usa la wallet de este perfil.");
+        return;
+      }
+      setSecretVisible(true);
+    } catch (e) {
+      setRecoveryRevealError(e instanceof Error ? e.message : "Error al solicitar permiso");
+    } finally {
+      setRecoveryRevealLoading(false);
+    }
+  }, [profile?.wallet_public, storedSecret]);
+
+  const handleSaveProfileToken = async () => {
+    const token = profileTokenInput.trim();
+    setProfileTokenError(null);
+    setProfileTokenSaving(true);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ subject_profile_token: token || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setProfileTokenError(data?.details ?? data?.error ?? "Error al guardar");
+        return;
+      }
+      setProfileTokenInput("");
+      await fetchProfile();
+    } finally {
+      setProfileTokenSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -248,25 +306,46 @@ function ProfileContent() {
                   </p>
                 </div>
 
-                {/* Recovery key (solo si fue generada en este browser) */}
+                {/* Recovery key: desplegable y revelar solo con permiso de la wallet (estilo Metamask) */}
                 {storedSecret !== null && (
-                  <div>
-                    <Label>Clave secreta (recovery)</Label>
-                    {secretVisible ? (
-                      <p className="font-mono text-xs break-all bg-red-50 border-2 border-red-400 p-3 select-all">
-                        {storedSecret}
-                      </p>
-                    ) : (
-                      <button
-                        onClick={() => setSecretVisible(true)}
-                        className="w-full text-sm bg-red-50 border-2 border-red-400 p-3 text-red-700 hover:bg-red-100 transition-colors"
-                      >
-                        Clic para revelar clave secreta
-                      </button>
+                  <div className="border-2 border-[var(--black)] overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setRecoveryOpen((o) => !o)}
+                      className="w-full flex items-center justify-between gap-2 py-3 px-4 bg-[var(--beige)] hover:bg-[var(--black)]/5 text-left text-sm font-[var(--font-pixel)]"
+                    >
+                      <span>Clave secreta (recovery)</span>
+                      <span className="text-[var(--black)]/70">{recoveryOpen ? "▼" : "▶"}</span>
+                    </button>
+                    {recoveryOpen && (
+                      <div className="p-4 pt-0 space-y-3 bg-[var(--white)] border-t-2 border-[var(--black)]">
+                        {secretVisible ? (
+                          <p className="font-mono text-xs break-all bg-red-50 border-2 border-red-400 p-3 select-all">
+                            {storedSecret}
+                          </p>
+                        ) : (
+                          <>
+                            <p className="text-xs text-[var(--black)]/70">
+                              Para ver la clave, Freighter te pedirá que firmes un mensaje (como en MetaMask). Solo la wallet vinculada a este perfil puede revelarla.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={handleRevealSecretWithWallet}
+                              disabled={recoveryRevealLoading}
+                              className="w-full text-sm py-2 px-4 border-2 border-[var(--black)] bg-amber-100 text-amber-900 hover:bg-amber-200 disabled:opacity-50 font-[var(--font-pixel)]"
+                            >
+                              {recoveryRevealLoading ? "Abre Freighter para firmar…" : "Revelar clave (confirmar en Freighter)"}
+                            </button>
+                            {recoveryRevealError && (
+                              <p className="text-xs text-red-600">{recoveryRevealError}</p>
+                            )}
+                          </>
+                        )}
+                        <p className="text-xs text-[var(--black)]/60">
+                          ⚠️ Solo almacenada en este navegador. Guárdala en un lugar seguro.
+                        </p>
+                      </div>
                     )}
-                    <p className="text-xs text-[var(--black)]/60 mt-1">
-                      ⚠️ Solo almacenada en este navegador. Guárdala en un lugar seguro.
-                    </p>
                   </div>
                 )}
 
@@ -289,6 +368,74 @@ function ProfileContent() {
                 >
                   Configurar wallet
                 </Button>
+              </div>
+            )}
+          </div>
+
+          {/* QR de verificación del perfil de certificaciones */}
+          <div className="border-t-2 border-[var(--black)] pt-4 space-y-3">
+            <h2
+              className="text-sm font-[var(--font-pixel)]"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
+              VERIFICAR MI PERFIL (QR)
+            </h2>
+            {profile.subject_profile_token ? (
+              <div className="flex flex-col items-start gap-2">
+                <p className="text-sm text-[var(--black)]/70">
+                  Escanea este QR para abrir tu perfil público de certificaciones.
+                </p>
+                <div className="bg-white p-3 border-2 border-[var(--black)] inline-block">
+                  <QRCodeSVG
+                    value={typeof window !== "undefined" ? `${window.location.origin}/perfil-certificado/${profile.subject_profile_token}` : ""}
+                    size={180}
+                    level="M"
+                  />
+                </div>
+                <p className="text-xs font-mono break-all text-[var(--black)]/70">
+                  {typeof window !== "undefined" ? `${window.location.origin}/perfil-certificado/${profile.subject_profile_token}` : ""}
+                </p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={async () => {
+                    setProfileTokenInput("");
+                    const res = await fetch("/api/profile", {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      credentials: "include",
+                      body: JSON.stringify({ subject_profile_token: null }),
+                    });
+                    if (res.ok) await fetchProfile();
+                  }}
+                  disabled={profileTokenSaving}
+                >
+                  Quitar QR
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm text-[var(--black)]/70">
+                  Si tienes un perfil de certificaciones (te dieron un enlace tipo /perfil-certificado/XXXX), pega aquí el código para mostrar tu QR.
+                </p>
+                <div className="flex gap-2 flex-wrap items-center">
+                  <input
+                    type="text"
+                    value={profileTokenInput}
+                    onChange={(e) => setProfileTokenInput(e.target.value)}
+                    placeholder="Ej: ABCDEF12345678"
+                    className="flex-1 min-w-[120px] px-3 py-2 border-2 border-[var(--black)] bg-[var(--white)] text-sm font-mono"
+                  />
+                  <Button
+                    type="button"
+                    variant="primary"
+                    onClick={handleSaveProfileToken}
+                    disabled={profileTokenSaving || !profileTokenInput.trim()}
+                  >
+                    {profileTokenSaving ? "Guardando…" : "Añadir y mostrar QR"}
+                  </Button>
+                </div>
+                {profileTokenError && <p className="text-xs text-red-600">{profileTokenError}</p>}
               </div>
             )}
           </div>
